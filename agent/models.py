@@ -8,9 +8,10 @@ class DataFetchParameters(BaseModel):
     metric: Literal["revenues", "balances"]
     entities: List[str]
     date_description: str
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"]
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
+    region: Optional[List[str]] = Field(None, description="A list of regions to filter on, e.g., ['EMEA', 'AMERICAS']")
     output_variable: str = Field(..., description="The variable name to store the resulting dataframe in the workspace.")
 
 class GetValidBusinessLinesParameters(BaseModel):

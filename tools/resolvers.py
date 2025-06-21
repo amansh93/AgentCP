@@ -16,6 +16,45 @@ from knowledge_base.client_data import CLIENT_NAME_TO_ID, CLIENT_GROUP_TO_IDS, V
 from agent.llm_client import get_llm_client
 from agent.config import DATE_PARSER_MODEL
 
+# --- Canonical Values and Mappings ---
+
+CANONICAL_REGIONS = ["AMERICAS", "EMEA", "ASIA", "NA"]
+REGION_ALIAS_MAP = {
+    "americas": "AMERICAS",
+    "america": "AMERICAS",
+    "emea": "EMEA",
+    "europe": "EMEA",
+    "asia": "ASIA",
+    "na": "NA",
+    "north america": "NA"
+}
+
+# --- Entity Resolvers ---
+
+def resolve_regions(names: List[str]) -> List[str]:
+    """
+    Resolves a list of region names/aliases into a list of canonical region names.
+    Handles 'global' to return all regions.
+    """
+    if not names:
+        return []
+
+    resolved_regions: Set[str] = set()
+    
+    # Standardize input to lower case for matching
+    clean_names = [name.lower().strip() for name in names]
+
+    if "global" in clean_names:
+        return CANONICAL_REGIONS
+
+    for name in clean_names:
+        if name in REGION_ALIAS_MAP:
+            resolved_regions.add(REGION_ALIAS_MAP[name])
+        else:
+            print(f"Warning: Could not resolve region '{name}'. Ignoring.")
+    
+    return list(resolved_regions)
+
 
 def resolve_clients(names: List[str]) -> List[str]:
     """

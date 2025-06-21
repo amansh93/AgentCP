@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from .resolvers import resolve_clients, resolve_dates
+from .resolvers import resolve_clients, resolve_dates, resolve_regions
 from .api_wrappers import get_revenues, get_balances
 
 class SimpleQueryInput(BaseModel):
@@ -13,9 +13,10 @@ class SimpleQueryInput(BaseModel):
     metric: Literal["revenues", "balances"]
     entities: List[str] = Field(..., description="List of client names or group names, e.g., ['millennium', 'systematic']")
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
+    regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"]
 
 class SimpleQueryTool:
     """
@@ -32,9 +33,11 @@ class SimpleQueryTool:
         # 1. Resolve entities using our robust resolvers
         client_ids = resolve_clients(query_input.entities)
         start_date, end_date = resolve_dates(query_input.date_description)
+        regions = resolve_regions(query_input.regions)
 
         print(f"Resolved Clients: {client_ids}")
         print(f"Resolved Dates: {start_date} to {end_date}")
+        print(f"Resolved Regions: {regions}")
 
         # 2. Select the correct API function based on the metric
         api_call = get_revenues if query_input.metric == "revenues" else get_balances
@@ -45,6 +48,7 @@ class SimpleQueryTool:
             start_date=start_date,
             end_date=end_date,
             granularity=query_input.granularity,
+            region=regions,
             business=query_input.business,
             subbusiness=query_input.subbusiness
         )

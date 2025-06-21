@@ -13,6 +13,7 @@ def _generate_mock_data(client_ids: List[str], start_date: str, end_date: str) -
     # All possible business/sub-business lines
     businesses = ["Prime", "Equities Ex Prime", "FICC"]
     subbusinesses = ["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]
+    regions = ["AMERICAS", "EMEA", "ASIA", "NA"]
 
     data = []
     for date in dates:
@@ -21,17 +22,19 @@ def _generate_mock_data(client_ids: List[str], start_date: str, end_date: str) -
             for _ in range(np.random.randint(1, 4)):
                 bus = np.random.choice(businesses)
                 sub = np.random.choice(subbusinesses)
+                reg = np.random.choice(regions)
                 data.append({
                     "date": date,
                     "client_id": client_id,
                     "business": bus,
                     "subbusiness": sub,
+                    "region": reg,
                     "revenues": np.random.randint(1000, 50000),
                     "balances": np.random.randint(100000, 5000000)
                 })
     
     if not data:
-        return pd.DataFrame(columns=['date', 'client_id', 'business', 'subbusiness', 'revenues', 'balances'])
+        return pd.DataFrame(columns=['date', 'client_id', 'business', 'subbusiness', 'region', 'revenues', 'balances'])
 
     return pd.DataFrame(data)
 
@@ -41,7 +44,8 @@ def get_revenues(
     client_ids: List[str],
     start_date: str,
     end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"],
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"],
+    region: Optional[List[str]] = None,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
 ) -> pd.DataFrame:
@@ -57,6 +61,8 @@ def get_revenues(
         return pd.DataFrame({'revenues': []})
 
     # Filter by business lines if specified
+    if region:
+        df = df[df['region'].isin(region)]
     if business:
         df = df[df['business'] == business]
     if subbusiness:
@@ -68,7 +74,7 @@ def get_revenues(
         return pd.DataFrame({"revenues": [total_revenues]})
     
     # For any other granularity, group by that column and sum revenues
-    if granularity in ["client", "date", "business", "subbusiness"]:
+    if granularity in ["client", "date", "business", "subbusiness", "region"]:
         # We map granularity to the actual column name
         group_col = 'client_id' if granularity == 'client' else granularity
         
@@ -86,7 +92,8 @@ def get_balances(
     client_ids: List[str],
     start_date: str,
     end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"],
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"],
+    region: Optional[List[str]] = None,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
 ) -> pd.DataFrame:
@@ -102,6 +109,8 @@ def get_balances(
         return pd.DataFrame({'balances': []})
 
     # Filter by business lines if specified
+    if region:
+        df = df[df['region'].isin(region)]
     if business:
         df = df[df['business'] == business]
     if subbusiness:
@@ -112,7 +121,7 @@ def get_balances(
         total_balances = df['balances'].sum()
         return pd.DataFrame({"balances": [total_balances]})
     
-    if granularity in ["client", "date", "business", "subbusiness"]:
+    if granularity in ["client", "date", "business", "subbusiness", "region"]:
         # We map granularity to the actual column name
         group_col = 'client_id' if granularity == 'client' else granularity
         
