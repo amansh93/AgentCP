@@ -9,111 +9,48 @@ from pydantic import BaseModel, Field
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# New imports for vector-based resolution
-import numpy as np
-import faiss
-from sentence_transformers import SentenceTransformer
+# Use rapidfuzz for string matching
+from rapidfuzz import process, fuzz
 
 from knowledge_base.client_data import CLIENT_NAME_TO_ID, CLIENT_GROUP_TO_IDS, VALID_BUSINESSES, VALID_SUBBUSINESSES
 
-# --- Helper class for Vector-based Entity Resolution ---
 
-class VectorResolver:
+def resolve_clients(names: List[str]) -> List[str]:
     """
-    A generic resolver that uses vector embeddings and FAISS for fast and
-    accurate semantic matching of entities.
+    Resolves a list of client or group names into a list of client IDs.
+
+    - Handles fuzzy matching for typos using RapidFuzz.
+    - Expands group names into their constituent client IDs.
+    - Deduplicates the final list of IDs.
     """
-    def __init__(self, items_to_index: List[str], model_name: str = 'BAAI/bge-base-en-v1.5'):
-        print(f"Initializing VectorResolver with {len(items_to_index)} items...")
-        self.model = SentenceTransformer(model_name)
-        self.items = items_to_index
+    if not names:
+        return []
+
+    # Combine all known client and group names for efficient matching
+    all_known_entities = list(CLIENT_NAME_TO_ID.keys()) + list(CLIENT_GROUP_TO_IDS.keys())
+    resolved_ids: Set[str] = set()
+
+    for name in names:
+        # Standardize the input name
+        clean_name = name.lower().strip()
+
+        # Find the best match from our knowledge base using RapidFuzz
+        # process.extractOne returns (match, score, key)
+        best_match, score, _ = process.extractOne(clean_name, all_known_entities)
         
-        # Generate embeddings and build the FAISS index
-        embeddings = self.model.encode(self.items, convert_to_tensor=False, show_progress_bar=False)
-        self.index = faiss.IndexFlatL2(embeddings.shape[1])
-        self.index.add(np.array(embeddings, dtype=np.float32))
-        print("VectorResolver initialized successfully.")
+        # We can tune this threshold (0-100 for RapidFuzz)
+        if score < 80:
+            print(f"Warning: Could not confidently match '{name}'. Ignoring.")
+            continue
 
-    def find_best_match(self, query: str, score_threshold: float = 0.6) -> str | None:
-        """
-        Finds the best match for a given query string from the indexed items.
+        # Check if the match is a group and expand it
+        if best_match in CLIENT_GROUP_TO_IDS:
+            resolved_ids.update(CLIENT_GROUP_TO_IDS[best_match])
+        # Otherwise, assume it's an individual client
+        elif best_match in CLIENT_NAME_TO_ID:
+            resolved_ids.add(CLIENT_NAME_TO_ID[best_match])
 
-        Args:
-            query: The string to match.
-            score_threshold: The minimum similarity score to consider a match valid.
-                             This is based on cosine similarity, so it's between -1 and 1.
-                             A value of 0.6 is a reasonable starting point.
-
-        Returns:
-            The best matching string from the list, or None if no match is found
-            above the threshold.
-        """
-        if not query:
-            return None
-            
-        query_embedding = self.model.encode([query], convert_to_tensor=False)
-        # FAISS returns distances (L2), not similarity. For normalized embeddings (like from SBERT),
-        # L2 distance `d` can be converted to cosine similarity `s` via `s = 1 - (d^2 / 2)`.
-        distances, indices = self.index.search(np.array(query_embedding, dtype=np.float32), 1)
-        
-        best_match_index = indices[0][0]
-        best_match_distance = distances[0][0]
-        
-        # Convert L2 distance to cosine similarity
-        cosine_similarity = 1 - (best_match_distance**2 / 2)
-
-        if cosine_similarity >= score_threshold:
-            return self.items[best_match_index]
-        else:
-            print(f"Warning: Match for '{query}' found ('{self.items[best_match_index]}'), but score {cosine_similarity:.2f} is below threshold {score_threshold}. Ignoring.")
-            return None
-
-# --- Main Resolver Classes ---
-
-class ClientNameResolver:
-    """
-    Resolves client names and group names from natural language
-    into lists of specific client IDs using a vector-based approach.
-    """
-    def __init__(self):
-        # Prepare lists for indexing
-        self.client_name_to_id = {name.lower(): id for name, id in CLIENT_NAME_TO_ID.items()}
-        self.client_group_to_ids = {group.lower(): ids for group, ids in CLIENT_GROUP_TO_IDS.items()}
-        
-        # All individual client names that can be matched against
-        self.individual_client_names = list(self.client_name_to_id.keys())
-        
-        # Instantiate the vector resolver for individual names
-        self.vector_resolver = VectorResolver(self.individual_client_names)
-
-    def resolve(self, names: List[str]) -> List[str]:
-        """
-        Resolves a list of client or group names into a list of client IDs.
-        - Handles semantic matching for individual client names.
-        - Expands group names into their constituent client IDs.
-        - Deduplicates the final list of IDs.
-        """
-        if not names:
-            return []
-
-        resolved_ids: Set[str] = set()
-
-        for name in names:
-            clean_name = name.lower().strip()
-
-            # First, check for an exact match in groups (e.g., "Top 5 Clients")
-            if clean_name in self.client_group_to_ids:
-                resolved_ids.update(self.client_group_to_ids[clean_name])
-                continue
-
-            # If not a group, find the best semantic match for an individual client
-            best_match = self.vector_resolver.find_best_match(clean_name)
-            
-            if best_match:
-                # Get the ID for the matched name
-                resolved_ids.add(self.client_name_to_id[best_match])
-
-        return list(resolved_ids)
+    return list(resolved_ids)
 
 
 def resolve_sub_businesses(names: List[str]) -> List[str]:
@@ -123,18 +60,17 @@ def resolve_sub_businesses(names: List[str]) -> List[str]:
     if not names:
         return []
         
-    resolver = VectorResolver(VALID_SUBBUSINESSES)
-    
     resolved_names: Set[str] = set()
     for name in names:
-        match = resolver.find_best_match(name.lower().strip())
-        if match:
+        clean_name = name.lower().strip()
+        match, score, _ = process.extractOne(clean_name, VALID_SUBBUSINESSES)
+        if score > 80:
             resolved_names.add(match)
             
     return list(resolved_names)
 
 
-# --- Date Resolution (Largely Unchanged) ---
+# --- Date Resolution ---
 
 class DateRange(BaseModel):
     start_date: str = Field(..., description="The start date in YYYY-MM-DD format.")
