@@ -1,9 +1,7 @@
-import os
 import json
 import pandas as pd
-from openai import OpenAI
-from dotenv import load_dotenv
-
+from .llm_client import get_llm_client
+from .config import SYNTHESIZER_MODEL
 from .workspace import AgentWorkspace
 from knowledge_base.client_data import CLIENT_URL_SKELETON
 
@@ -13,8 +11,7 @@ class ResponseSynthesizer:
     a user-friendly, natural language response.
     """
     def __init__(self):
-        load_dotenv()
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = get_llm_client()
 
     def _build_prompt(self, user_query: str, workspace: AgentWorkspace) -> str:
         """Builds the system prompt for the response synthesizer LLM."""
@@ -56,7 +53,7 @@ You are an expert financial analyst assistant. Your task is to provide a clear, 
         prompt = self._build_prompt(user_query, workspace)
 
         response = self.client.chat.completions.create(
-            model="gpt-4-turbo",
+            model=SYNTHESIZER_MODEL,
             messages=[
                 {"role": "system", "content": "You are a helpful financial analyst assistant."},
                 {"role": "user", "content": prompt}
