@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries
+from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries, resolve_fin_or_exec, resolve_primary_or_secondary
 from .api_wrappers import get_revenues, get_balances
 
 class InformUserInput(BaseModel):
@@ -26,6 +26,8 @@ class SimpleQueryInput(BaseModel):
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
     countries: Optional[List[str]] = Field(None, description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
+    fin_or_exec: Optional[List[str]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY). Aliases: 'commissions', 'comms'.")
+    primary_or_secondary: Optional[List[str]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"]
@@ -47,11 +49,15 @@ class SimpleQueryTool:
         start_date, end_date = resolve_dates(query_input.date_description)
         regions = resolve_regions(query_input.regions)
         countries = resolve_countries(query_input.countries)
+        fin_or_exec = resolve_fin_or_exec(query_input.fin_or_exec)
+        primary_or_secondary = resolve_primary_or_secondary(query_input.primary_or_secondary)
 
         print(f"Resolved Clients: {client_ids}")
         print(f"Resolved Dates: {start_date} to {end_date}")
         print(f"Resolved Regions: {regions}")
         print(f"Resolved Countries: {countries}")
+        print(f"Resolved Fin/Exec: {fin_or_exec}")
+        print(f"Resolved Primary/Secondary: {primary_or_secondary}")
 
         # 2. Select the correct API function based on the metric
         if query_input.metric == "revenues":
@@ -61,6 +67,8 @@ class SimpleQueryTool:
                 end_date=end_date,
                 granularity=query_input.granularity,
                 region=regions,
+                fin_or_exec=fin_or_exec,
+                primary_or_secondary=primary_or_secondary,
                 business=query_input.business,
                 subbusiness=query_input.subbusiness
             )

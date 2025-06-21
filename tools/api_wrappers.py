@@ -22,6 +22,8 @@ def _generate_mock_data(client_ids: List[str], start_date: str, end_date: str) -
         "ASIA": ["JPN", "HKG", "AUS"],
         "NA": ["USA", "CAN"] # NA is a subset of AMERICAS for this example
     }
+    fin_or_exec_options = ["Financing", "Execution"]
+    primary_or_secondary_options = ["Primary", "Secondary"]
 
     data = []
     for date in dates:
@@ -32,6 +34,8 @@ def _generate_mock_data(client_ids: List[str], start_date: str, end_date: str) -
                 sub = np.random.choice(subbusinesses)
                 reg = np.random.choice(regions)
                 cty = np.random.choice(country_map.get(reg, ["USA"])) # Default to USA if region has no countries
+                fin_exec = np.random.choice(fin_or_exec_options)
+                prim_sec = np.random.choice(primary_or_secondary_options)
                 data.append({
                     "date": date,
                     "client_id": client_id,
@@ -39,12 +43,14 @@ def _generate_mock_data(client_ids: List[str], start_date: str, end_date: str) -
                     "subbusiness": sub,
                     "region": reg,
                     "country": cty,
+                    "fin_or_exec": fin_exec,
+                    "primary_or_secondary": prim_sec,
                     "revenues": np.random.randint(1000, 50000),
                     "balances": np.random.randint(100000, 5000000)
                 })
     
     if not data:
-        return pd.DataFrame(columns=['date', 'client_id', 'business', 'subbusiness', 'region', 'country', 'revenues', 'balances'])
+        return pd.DataFrame(columns=['date', 'client_id', 'business', 'subbusiness', 'region', 'country', 'fin_or_exec', 'primary_or_secondary', 'revenues', 'balances'])
 
     return pd.DataFrame(data)
 
@@ -56,6 +62,8 @@ def get_revenues(
     end_date: str,
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"],
     region: Optional[List[str]] = None,
+    fin_or_exec: Optional[List[str]] = None,
+    primary_or_secondary: Optional[List[str]] = None,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
 ) -> pd.DataFrame:
@@ -73,6 +81,10 @@ def get_revenues(
     # Filter by business lines if specified
     if region:
         df = df[df['region'].isin(region)]
+    if fin_or_exec:
+        df = df[df['fin_or_exec'].isin(fin_or_exec)]
+    if primary_or_secondary:
+        df = df[df['primary_or_secondary'].isin(primary_or_secondary)]
     if business:
         df = df[df['business'] == business]
     if subbusiness:

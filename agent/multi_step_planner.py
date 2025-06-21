@@ -116,6 +116,8 @@ Your available tools are:
 1. `data_fetch`: To get revenue or balance data from an API.
    - The `regions` parameter can be a list of: "AMERICAS", "EMEA", "ASIA", "NA", or aliases like "Europe". "global" is also a valid option.
    - The `countries` parameter can be a list of countries, e.g. ["USA", "GBR"]. (For 'balances' metric ONLY).
+   - The `fin_or_exec` parameter can be one of: "Financing", "Execution". Aliases for "Execution" are "commissions" or "comms". (For 'revenues' metric ONLY).
+   - The `primary_or_secondary` parameter can be one of: "Primary", "Secondary". (For 'revenues' metric ONLY).
    - The `business` parameter can be one of: "Prime", "Equities Ex Prime", "FICC".
    - The `subbusiness` parameter can be one of: "PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro".
    - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only).

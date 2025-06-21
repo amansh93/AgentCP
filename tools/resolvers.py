@@ -45,7 +45,55 @@ COUNTRY_ALIAS_MAP = {
     "australia": "AUS"
 }
 
+CANONICAL_FIN_OR_EXEC = ["Financing", "Execution"]
+FIN_OR_EXEC_ALIAS_MAP = {
+    "financing": "Financing",
+    "execution": "Execution",
+    "commissions": "Execution",
+    "comms": "Execution"
+}
+
+CANONICAL_PRIMARY_OR_SECONDARY = ["Primary", "Secondary"]
+PRIMARY_OR_SECONDARY_ALIAS_MAP = {
+    "primary": "Primary",
+    "secondary": "Secondary"
+}
+
 # --- Entity Resolvers ---
+
+def resolve_fin_or_exec(names: List[str]) -> List[str]:
+    """
+    Resolves a list of financing/execution aliases into a canonical list.
+    """
+    if not names:
+        return []
+    
+    resolved_values: Set[str] = set()
+    for name in names:
+        clean_name = name.lower().strip()
+        if clean_name in FIN_OR_EXEC_ALIAS_MAP:
+            resolved_values.add(FIN_OR_EXEC_ALIAS_MAP[clean_name])
+        else:
+            print(f"Warning: Could not resolve fin_or_exec '{name}'. Ignoring.")
+
+    return list(resolved_values)
+
+def resolve_primary_or_secondary(names: List[str]) -> List[str]:
+    """
+    Resolves a list of primary/secondary aliases into a canonical list.
+    """
+    if not names:
+        return []
+
+    resolved_values: Set[str] = set()
+    for name in names:
+        clean_name = name.lower().strip()
+        if clean_name in PRIMARY_OR_SECONDARY_ALIAS_MAP:
+            resolved_values.add(PRIMARY_OR_SECONDARY_ALIAS_MAP[clean_name])
+        else:
+            print(f"Warning: Could not resolve primary_or_secondary '{name}'. Ignoring.")
+            
+    return list(resolved_values)
 
 def resolve_regions(names: List[str]) -> List[str]:
     """
