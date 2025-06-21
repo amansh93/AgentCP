@@ -30,7 +30,7 @@ class SimpleQueryInput(BaseModel):
     primary_or_secondary: Optional[List[str]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
 
 class SimpleQueryTool:
     """
