@@ -60,7 +60,7 @@ def get_revenues(
     client_ids: List[str],
     start_date: str,
     end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"],
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "fin_or_exec", "primary_or_secondary"],
     region: Optional[List[str]] = None,
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
@@ -96,7 +96,7 @@ def get_revenues(
         return pd.DataFrame({"revenues": [total_revenues]})
     
     # For any other granularity, group by that column and sum revenues
-    if granularity in ["client", "date", "business", "subbusiness", "region"]:
+    if granularity in ["client", "date", "business", "subbusiness", "region", "fin_or_exec", "primary_or_secondary"]:
         # We map granularity to the actual column name
         group_col = 'client_id' if granularity == 'client' else granularity
         

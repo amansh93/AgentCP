@@ -120,7 +120,7 @@ Your available tools are:
    - The `primary_or_secondary` parameter can be one of: "Primary", "Secondary". (For 'revenues' metric ONLY).
    - The `business` parameter can be one of: "Prime", "Equities Ex Prime", "FICC".
    - The `subbusiness` parameter can be one of: "PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro".
-   - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only).
+   - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only).
 2. `describe_dataframe`: To see the schema (columns and data types) of a dataframe that you have fetched.
 3. `code_executor`: To perform any kind of analysis on the dataframes using Python and the pandas library. The final line of your code block MUST be an expression that results in a pandas DataFrame, which will be saved back to the workspace.
 4. `get_valid_business_lines`: To get a list of valid `business` and `subbusiness` values for the `data_fetch` tool.

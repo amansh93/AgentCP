@@ -8,7 +8,7 @@ class DataFetchParameters(BaseModel):
     metric: Literal["revenues", "balances"]
     entities: List[str]
     date_description: str
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     region: Optional[List[str]] = Field(None, description="A list of regions to filter on, e.g., ['EMEA', 'AMERICAS']")
