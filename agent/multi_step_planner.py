@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 import json
 
 from .models import MultiStepPlan
+from .llm_client import get_llm_client
+from .config import PLANNER_MODEL
 
 class MultiStepPlanner:
     """
@@ -12,8 +14,7 @@ class MultiStepPlanner:
     structured, multi-step plan that can be executed by our tools.
     """
     def __init__(self):
-        load_dotenv()
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = get_llm_client()
         self._system_prompt = self._build_system_prompt()
 
     def _build_system_prompt(self) -> str:
@@ -33,7 +34,7 @@ You are an expert financial analyst assistant. Your task is to decompose a user'
 4.  **Step-by-Step Analysis**: Perform your analysis in small, logical chunks using the `code_executor`. Do not write long, multi-step scripts in a single tool call.
 5.  **Handle Derived Metrics**: Some financial metrics are derived. For example, "Return on Balances (RoB)" is not a metric you can fetch directly. You must calculate it by fetching `revenues` and `balances` separately for the same period, and then using `code_executor` to compute the ratio: `RoB = revenues / balances`.
 6.  **Use Your Tools for Knowledge**: If you are unsure about the available `business` or `subbusiness` lines for a `data_fetch` call, you should use the `get_valid_business_lines` tool first to retrieve the most up-to-date options.
-7.  **Group by Business Line**: For queries that ask for metrics "by business" or "by subbusiness", use the `granularity` parameter in your `data_fetch` call. Set it to `"business"` or `"subbusiness"` to get the data pre-aggregated.
+7.  **Group by Business or Sub-Business Line**: For queries that ask for metrics "by business" or "by subbusiness", use the `granularity` parameter in your `data_fetch` call. Set it to `"business"` or `"subbusiness"` to get the data pre-aggregated.
 8.  **Plotting**: To plot data, you must first fetch it with daily or monthly granularity (e.g., set `granularity` to `"date"` in your `data_fetch` call). Then, use `code_executor` to write Python code with the `matplotlib` library. Your code MUST save the plot to a file in the `static/plots/` directory with a unique, timestamped name and output a pandas DataFrame containing the path to the plot. For example: `plot_path = f"static/plots/plot_{{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}}.png"; plt.savefig(plot_path); pd.DataFrame([{{'plot_path': plot_path}}])`.
 
 --- FEW-SHOT EXAMPLE ---
@@ -119,7 +120,7 @@ For each step in the plan, you must provide:
         print("\n--- Planner: Creating a multi-step plan ---")
         
         response = self.client.chat.completions.create(
-            model="gpt-4-turbo",
+            model=PLANNER_MODEL,
             messages=[
                 {"role": "system", "content": self._system_prompt},
                 {"role": "user", "content": user_query}

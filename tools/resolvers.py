@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from rapidfuzz import process, fuzz
 
 from knowledge_base.client_data import CLIENT_NAME_TO_ID, CLIENT_GROUP_TO_IDS, VALID_BUSINESSES, VALID_SUBBUSINESSES
+from agent.llm_client import get_llm_client
+from agent.config import DATE_PARSER_MODEL
 
 
 def resolve_clients(names: List[str]) -> List[str]:
@@ -78,8 +80,7 @@ class DateRange(BaseModel):
 
 def _get_llm_date_range(date_description: str) -> (str, str):
     """(Internal) Use an LLM to parse a complex date description."""
-    load_dotenv()
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = get_llm_client()
     
     schema = DateRange.model_json_schema()
 
@@ -95,7 +96,7 @@ Respond with ONLY the JSON object.
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=DATE_PARSER_MODEL,
             messages=[{"role": "system", "content": prompt}],
             response_format={"type": "json_object"}
         )
