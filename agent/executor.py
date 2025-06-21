@@ -5,6 +5,13 @@ from tools.query_tool import SimpleQueryTool, SimpleQueryInput
 from tools.code_executor import describe_dataframe, execute_python_code
 from tools.resolvers import get_valid_business_lines
 
+class HumanInterventionRequired(Exception):
+    """Custom exception to signal that the agent is stuck and needs help."""
+    def __init__(self, message="Agent requires human intervention.", context=None):
+        self.message = message
+        self.context = context
+        super().__init__(self.message)
+
 class Executor:
     """
     The Executor is the "doer" of the agent. It takes a multi-step plan
@@ -24,7 +31,8 @@ class Executor:
         plan_steps = list(initial_plan.plan)
         summaries = []
         current_step_index = 0
-        max_retries = 3
+        max_retries = 2 # Max retries per step
+        retries = 0
 
         while current_step_index < len(plan_steps):
             step = plan_steps[current_step_index]
@@ -56,12 +64,24 @@ class Executor:
                 else:
                     raise ValueError(f"Unknown tool_name: {tool_name}")
 
+                # Successful execution, reset retry counter and move to next step
+                retries = 0
                 current_step_index += 1
 
             except Exception as e:
                 error_message = str(e)
                 print(f"--- Step Failed: {error_message} ---")
                 
+                retries += 1
+                if retries >= max_retries:
+                    context = {
+                        "original_query": user_query,
+                        "failed_step": step.summary,
+                        "error_message": error_message,
+                        "workspace_summary": self.workspace.list_dfs(),
+                    }
+                    raise HumanInterventionRequired(context=context)
+
                 correction_prompt = f"""
 The previous plan failed during a step. Your task is to create a new plan to achieve the original user goal.
 

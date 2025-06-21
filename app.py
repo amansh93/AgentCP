@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 
 from flask import Flask, render_template, request, jsonify
 from agent.multi_step_planner import MultiStepPlanner
-from agent.executor import Executor
+from agent.executor import Executor, HumanInterventionRequired
 from agent.response_synthesizer import ResponseSynthesizer
 
 app = Flask(__name__)
@@ -34,13 +34,21 @@ def ask():
         final_answer = synthesizer.synthesize(user_query, final_workspace)
         
         return jsonify({
+            "status": "success",
             "answer": final_answer,
             "reasoning_steps": summaries
         })
 
+    except HumanInterventionRequired as e:
+        return jsonify({
+            "status": "needs_human_input",
+            "message": e.message,
+            "context": e.context
+        }), 200 # Return 200 OK as this is an expected state
+
     except Exception as e:
         print(f"An error occurred: {e}")
-        return jsonify({"error": "An internal error occurred. Please check the server logs."}), 500
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001) 

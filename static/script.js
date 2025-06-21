@@ -34,7 +34,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            appendMessage(data.answer, 'bot', data.reasoning_steps);
+
+            if (data.status === 'needs_human_input') {
+                handleHumanIntervention(data.context);
+            } else {
+                appendMessage(data.answer, 'bot', data.reasoning_steps);
+            }
 
         } catch (error) {
             chatContainer.removeChild(thinkingMessage);
@@ -82,5 +87,22 @@ document.addEventListener('DOMContentLoaded', () => {
         chatContainer.appendChild(messageDiv);
         chatContainer.scrollTop = chatContainer.scrollHeight; // Auto-scroll to bottom
         return messageDiv;
+    }
+
+    function handleHumanIntervention(context) {
+        const interventionDiv = document.createElement('div');
+        interventionDiv.classList.add('message', 'bot-message', 'intervention-message');
+
+        const contextHtml = `
+            <p>I'm having trouble with this request. Here's what went wrong:</p>
+            <ul>
+                <li><strong>Original Query:</strong> ${context.original_query}</li>
+                <li><strong>Failed Step:</strong> ${context.failed_step}</li>
+                <li><strong>Error:</strong> ${context.error_message}</li>
+            </ul>
+            <p>How would you like me to proceed?</p>
+        `;
+        interventionDiv.innerHTML = contextHtml;
+        chatContainer.appendChild(interventionDiv);
     }
 }); 
