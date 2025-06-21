@@ -28,7 +28,15 @@ def ask():
         plan = planner.create_plan(user_query)
 
         # 2. Executor executes the plan
-        final_workspace, summaries = executor.execute_plan(plan, user_query)
+        final_workspace, summaries, message = executor.execute_plan(plan, user_query)
+
+        # If the executor returned a direct message, use it as the answer
+        if message:
+            return jsonify({
+                "status": "success",
+                "answer": message,
+                "reasoning_steps": summaries
+            })
 
         # 3. Synthesizer generates the final response
         final_answer = synthesizer.synthesize(user_query, final_workspace)
