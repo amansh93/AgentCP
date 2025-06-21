@@ -1,7 +1,7 @@
 from .models import MultiStepPlan
 from .workspace import AgentWorkspace
 from .multi_step_planner import MultiStepPlanner
-from tools.query_tool import SimpleQueryTool, SimpleQueryInput
+from tools.query_tool import SimpleQueryTool, SimpleQueryInput, InformUserTool, InformUserInput
 from tools.code_executor import describe_dataframe, execute_python_code
 from tools.resolvers import get_valid_business_lines
 
@@ -20,6 +20,7 @@ class Executor:
     def __init__(self, planner: MultiStepPlanner):
         self.workspace = AgentWorkspace()
         self.simple_query_tool = SimpleQueryTool()
+        self.inform_user_tool = InformUserTool()
         self.planner = planner
         print("--- Executor initialized ---")
 
@@ -48,6 +49,13 @@ class Executor:
                     query_input = SimpleQueryInput(**params.dict(exclude={'output_variable'}))
                     result_df = self.simple_query_tool.execute(query_input)
                     self.workspace.add_df(params.output_variable, result_df)
+                
+                elif tool_name == "inform_user":
+                    tool_input = InformUserInput(**params.dict())
+                    message = self.inform_user_tool.execute(tool_input)
+                    # If this tool is called, it's a terminal step.
+                    # We return the message and stop execution.
+                    return self.workspace, summaries, message
                 
                 elif tool_name == "describe_dataframe":
                     description = describe_dataframe(self.workspace, params.df_name)
@@ -105,4 +113,4 @@ Please create a new, corrected plan to recover from this error and complete the 
                 # Do not increment step index, so we retry the corrected step
         
         print("\n--- Executor: Plan execution finished ---")
-        return self.workspace, summaries 
+        return self.workspace, summaries, None 

@@ -5,6 +5,17 @@ from pydantic import BaseModel, Field
 from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries
 from .api_wrappers import get_revenues, get_balances
 
+class InformUserInput(BaseModel):
+    """Input model for the InformUserTool."""
+    message: str = Field(..., description="The message to convey to the user.")
+
+class InformUserTool:
+    """A tool to communicate information or limitations back to the user."""
+    def execute(self, tool_input: InformUserInput) -> str:
+        """Simply returns the message to be shown to the user."""
+        print(f"\n--- Informing User: {tool_input.message} ---")
+        return tool_input.message
+
 class SimpleQueryInput(BaseModel):
     """
     Defines the structured input required by the SimpleQueryTool.

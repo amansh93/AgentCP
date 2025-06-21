@@ -27,6 +27,10 @@ class CodeExecutorParameters(BaseModel):
     """Parameters for executing Python code."""
     code: str = Field(..., description="A string of valid Python code to execute. It has access to a dict called 'dataframes'.")
 
+class InformUserParameters(BaseModel):
+    """Parameters for the inform_user tool."""
+    message: str = Field(..., description="The message to be sent to the user.")
+
 # --- Step models. 'tool_name' will act as the discriminator ---
 
 class DataFetchStep(BaseModel):
@@ -49,8 +53,13 @@ class CodeExecutorStep(BaseModel):
     summary: str = Field(..., description="A natural language summary of what this step does for the user.")
     parameters: CodeExecutorParameters
 
+class InformUserStep(BaseModel):
+    tool_name: Literal["inform_user"] = "inform_user"
+    summary: str = Field(..., description="A natural language summary of what this step does for the user.")
+    parameters: InformUserParameters
+
 # A single step in a plan can be any of these types
-PlanStep = Union[DataFetchStep, DescribeDataframeStep, CodeExecutorStep, GetValidBusinessLinesStep]
+PlanStep = Union[DataFetchStep, DescribeDataframeStep, CodeExecutorStep, GetValidBusinessLinesStep, InformUserStep]
 
 # The final plan is a list of these steps
 class MultiStepPlan(BaseModel):

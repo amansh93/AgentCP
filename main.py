@@ -23,7 +23,13 @@ def main_complex():
 
     # 4. The Executor executes the plan
     try:
-        final_workspace = executor.execute_plan(plan, user_query)
+        final_workspace, summaries, message = executor.execute_plan(plan, user_query)
+
+        if message:
+            print("\n\n==================== AGENT RESPONSE ====================")
+            print(message)
+            print("========================================================")
+            return
         
         # 5. The Synthesizer generates the final response
         final_answer = synthesizer.synthesize(user_query, final_workspace)
