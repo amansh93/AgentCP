@@ -25,7 +25,7 @@ class SimpleQueryInput(BaseModel):
     entities: List[str] = Field(..., description="List of client names or group names, e.g., ['millennium', 'systematic']")
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
-    countries: Optional[List[str]] = Field(None, description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
+    countries: Optional[List[str]] = Field(None, alias="country", description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
     fin_or_exec: Optional[List[str]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY). Aliases: 'commissions', 'comms'.")
     primary_or_secondary: Optional[List[str]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None

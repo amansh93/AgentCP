@@ -29,20 +29,29 @@ REGION_ALIAS_MAP = {
     "north america": "NA"
 }
 
-CANONICAL_COUNTRIES = ["USA", "CAN", "BRA", "GBR", "FRA", "DEU", "JPN", "HKG", "AUS"]
+CANONICAL_COUNTRIES = ["United States", "Canada", "Brazil", "United Kingdom", "France", "Germany", "Japan", "Hong Kong", "Australia"]
 COUNTRY_ALIAS_MAP = {
-    "united states": "USA",
-    "us": "USA",
-    "usa": "USA",
-    "canada": "CAN",
-    "brazil": "BRA",
-    "united kingdom": "GBR",
-    "uk": "GBR",
-    "france": "FRA",
-    "germany": "DEU",
-    "japan": "JPN",
-    "hong kong": "HKG",
-    "australia": "AUS"
+    "united states": "United States",
+    "us": "United States",
+    "usa": "United States",
+    "canada": "Canada",
+    "can": "Canada",
+    "brazil": "Brazil",
+    "bra": "Brazil",
+    "united kingdom": "United Kingdom",
+    "uk": "United Kingdom",
+    "gb": "United Kingdom",
+    "gbr": "United Kingdom",
+    "france": "France",
+    "fra": "France",
+    "germany": "Germany",
+    "deu": "Germany",
+    "japan": "Japan",
+    "jpn": "Japan",
+    "hong kong": "Hong Kong",
+    "hkg": "Hong Kong",
+    "australia": "Australia",
+    "aus": "Australia"
 }
 
 CANONICAL_FIN_OR_EXEC = ["Financing", "Execution"]
@@ -291,18 +300,15 @@ def get_valid_business_lines():
 
 def resolve_countries(names: List[str]) -> List[str]:
     """
-    Resolves a list of country names/aliases into a list of canonical country codes.
+    Resolves a list of country names/aliases into a list of canonical country names.
     """
     if not names:
         return []
-
     resolved_countries: Set[str] = set()
-    clean_names = [name.lower().strip() for name in names]
-
-    for name in clean_names:
-        if name in COUNTRY_ALIAS_MAP:
-            resolved_countries.add(COUNTRY_ALIAS_MAP[name])
+    for name in names:
+        clean_name = name.lower().strip()
+        if clean_name in COUNTRY_ALIAS_MAP:
+            resolved_countries.add(COUNTRY_ALIAS_MAP[clean_name])
         else:
             print(f"Warning: Could not resolve country '{name}'. Ignoring.")
-            
-    return list(resolved_countries) 
+    return list(resolved_countries)
