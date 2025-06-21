@@ -8,7 +8,7 @@ class DataFetchParameters(BaseModel):
     metric: Literal["revenues", "balances"]
     entities: List[str]
     date_description: str
-    granularity: Literal["aggregate", "client", "date"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"]
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     output_variable: str = Field(..., description="The variable name to store the resulting dataframe in the workspace.")
