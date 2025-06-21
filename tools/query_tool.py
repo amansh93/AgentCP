@@ -1,6 +1,6 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Any
 import pandas as pd
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries, resolve_fin_or_exec, resolve_primary_or_secondary
 from .api_wrappers import get_revenues, get_balances
@@ -31,6 +31,13 @@ class SimpleQueryInput(BaseModel):
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
+
+    @validator('business', 'subbusiness', pre=True)
+    def empty_str_to_none(cls, v: Any) -> Optional[Any]:
+        """Converts an explicit 'None' string from the LLM to a real None."""
+        if isinstance(v, str) and v.lower() == 'none':
+            return None
+        return v
 
 class SimpleQueryTool:
     """
