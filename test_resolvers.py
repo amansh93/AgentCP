@@ -1,4 +1,4 @@
-from tools.resolvers import resolve_clients, resolve_dates
+from tools.resolvers import ClientNameResolver, resolve_dates
 from datetime import datetime
 
 def run_resolver_tests():
@@ -7,20 +7,23 @@ def run_resolver_tests():
     """
     print("--- Running Resolver Tests ---")
 
+    # Instantiate the resolver
+    client_resolver = ClientNameResolver()
+
     # Test cases for client resolver
-    print("\n--- Testing resolve_clients ---")
+    print("\n--- Testing ClientNameResolver ---")
     test_cases_clients = {
         "Simple lookup": (["millennium"], ["cl_id_millennium"]),
-        "Typo handling": (["pont 72"], ["cl_id_point72"]),
+        "Semantic match": (["pont 72"], ["cl_id_point72"]),
         "Group expansion": (["systematic"], ["cl_id_twosigma", "cl_id_citadel", "cl_id_some_other_quant"]),
         "Mixed list": (["Citadel", "quant"], ["cl_id_citadel", "cl_id_twosigma", "cl_id_some_other_quant"]),
         "Deduplication": (["Citadel", "systematic"], ["cl_id_citadel", "cl_id_twosigma", "cl_id_some_other_quant"]),
-        "Unknown entity": (["not_a_real_client"], []),
+        "Unknown entity": (["not a real client"], []),
     }
 
     for name, (inputs, expected) in test_cases_clients.items():
         # Sort lists to ensure comparison is order-independent
-        result = sorted(resolve_clients(inputs))
+        result = sorted(client_resolver.resolve(inputs))
         expected = sorted(expected)
         assert result == expected, f"'{name}' FAILED: Expected {expected}, got {result}"
         print(f"'{name}' PASSED")

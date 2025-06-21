@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from .resolvers import resolve_clients, resolve_dates
+from .resolvers import ClientNameResolver, resolve_dates
 from .api_wrappers import get_revenues, get_balances
 
 class SimpleQueryInput(BaseModel):
@@ -23,6 +23,10 @@ class SimpleQueryTool:
     It orchestrates resolvers and API wrappers to fulfill a structured request.
     """
 
+    def __init__(self):
+        # Initialize the resolver once to avoid reloading the model on every call
+        self.client_resolver = ClientNameResolver()
+
     def execute(self, query_input: SimpleQueryInput) -> pd.DataFrame:
         """
         Takes a structured query object, resolves entities, and calls the correct API.
@@ -30,7 +34,7 @@ class SimpleQueryTool:
         print("\n--- Executing SimpleQueryTool ---")
         
         # 1. Resolve entities using our robust resolvers
-        client_ids = resolve_clients(query_input.entities)
+        client_ids = self.client_resolver.resolve(query_input.entities)
         start_date, end_date = resolve_dates(query_input.date_description)
 
         print(f"Resolved Clients: {client_ids}")
