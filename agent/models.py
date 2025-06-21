@@ -13,8 +13,8 @@ class DataFetchParameters(BaseModel):
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     region: Optional[List[str]] = Field(None, description="A list of regions to filter on, e.g., ['EMEA', 'AMERICAS']")
     country: Optional[List[str]] = Field(None, description="A list of countries to filter on (for balances metric ONLY).")
-    fin_or_exec: Optional[Literal["Financing", "Execution"]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY).")
-    primary_or_secondary: Optional[Literal["Primary", "Secondary"]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
+    fin_or_exec: Optional[List[Literal["Financing", "Execution"]]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY).")
+    primary_or_secondary: Optional[List[Literal["Primary", "Secondary"]]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
     output_variable: str = Field(..., description="The variable name to store the resulting dataframe in the workspace.")
 
 class GetValidBusinessLinesParameters(BaseModel):
