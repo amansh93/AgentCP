@@ -15,7 +15,7 @@ class SimpleQueryInput(BaseModel):
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
-    granularity: Literal["aggregate", "client", "date"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"]
 
 class SimpleQueryTool:
     """
