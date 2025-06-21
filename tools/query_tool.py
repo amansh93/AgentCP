@@ -28,7 +28,7 @@ class SimpleQueryInput(BaseModel):
     countries: Optional[List[str]] = Field(None, description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
     fin_or_exec: Optional[List[str]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY). Aliases: 'commissions', 'comms'.")
     primary_or_secondary: Optional[List[str]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
-    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
 

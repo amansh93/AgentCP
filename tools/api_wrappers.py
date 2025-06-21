@@ -64,7 +64,7 @@ def get_revenues(
     region: Optional[List[str]] = None,
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
-    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None,
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
 ) -> pd.DataFrame:
     """
@@ -86,7 +86,10 @@ def get_revenues(
     if primary_or_secondary:
         df = df[df['primary_or_secondary'].isin(primary_or_secondary)]
     if business:
-        df = df[df['business'] == business]
+        if business == "Equities":
+            df = df[df['business'].isin(["Prime", "Equities Ex Prime"])]
+        else:
+            df = df[df['business'] == business]
     if subbusiness:
         df = df[df['subbusiness'] == subbusiness]
 
@@ -117,7 +120,7 @@ def get_balances(
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"],
     region: Optional[List[str]] = None,
     country: Optional[List[str]] = None,
-    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None,
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
 ) -> pd.DataFrame:
     """
@@ -137,7 +140,10 @@ def get_balances(
     if country:
         df = df[df['country'].isin(country)]
     if business:
-        df = df[df['business'] == business]
+        if business == "Equities":
+            df = df[df['business'].isin(["Prime", "Equities Ex Prime"])]
+        else:
+            df = df[df['business'] == business]
     if subbusiness:
         df = df[df['subbusiness'] == subbusiness]
 
