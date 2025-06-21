@@ -29,6 +29,22 @@ REGION_ALIAS_MAP = {
     "north america": "NA"
 }
 
+CANONICAL_COUNTRIES = ["USA", "CAN", "BRA", "GBR", "FRA", "DEU", "JPN", "HKG", "AUS"]
+COUNTRY_ALIAS_MAP = {
+    "united states": "USA",
+    "us": "USA",
+    "usa": "USA",
+    "canada": "CAN",
+    "brazil": "BRA",
+    "united kingdom": "GBR",
+    "uk": "GBR",
+    "france": "FRA",
+    "germany": "DEU",
+    "japan": "JPN",
+    "hong kong": "HKG",
+    "australia": "AUS"
+}
+
 # --- Entity Resolvers ---
 
 def resolve_regions(names: List[str]) -> List[str]:
@@ -224,3 +240,21 @@ def get_valid_business_lines():
         "valid_businesses": VALID_BUSINESSES,
         "valid_subbusinesses": VALID_SUBBUSINESSES
     } 
+
+def resolve_countries(names: List[str]) -> List[str]:
+    """
+    Resolves a list of country names/aliases into a list of canonical country codes.
+    """
+    if not names:
+        return []
+
+    resolved_countries: Set[str] = set()
+    clean_names = [name.lower().strip() for name in names]
+
+    for name in clean_names:
+        if name in COUNTRY_ALIAS_MAP:
+            resolved_countries.add(COUNTRY_ALIAS_MAP[name])
+        else:
+            print(f"Warning: Could not resolve country '{name}'. Ignoring.")
+            
+    return list(resolved_countries) 

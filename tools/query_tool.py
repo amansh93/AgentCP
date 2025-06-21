@@ -2,7 +2,7 @@ from typing import List, Literal, Optional
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from .resolvers import resolve_clients, resolve_dates, resolve_regions
+from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries
 from .api_wrappers import get_revenues, get_balances
 
 class SimpleQueryInput(BaseModel):
@@ -14,9 +14,10 @@ class SimpleQueryInput(BaseModel):
     entities: List[str] = Field(..., description="List of client names or group names, e.g., ['millennium', 'systematic']")
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
+    countries: Optional[List[str]] = Field(None, description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"]
 
 class SimpleQueryTool:
     """
@@ -34,24 +35,35 @@ class SimpleQueryTool:
         client_ids = resolve_clients(query_input.entities)
         start_date, end_date = resolve_dates(query_input.date_description)
         regions = resolve_regions(query_input.regions)
+        countries = resolve_countries(query_input.countries)
 
         print(f"Resolved Clients: {client_ids}")
         print(f"Resolved Dates: {start_date} to {end_date}")
         print(f"Resolved Regions: {regions}")
+        print(f"Resolved Countries: {countries}")
 
         # 2. Select the correct API function based on the metric
-        api_call = get_revenues if query_input.metric == "revenues" else get_balances
-
-        # 3. Call the selected API with the resolved and validated parameters
-        result_df = api_call(
-            client_ids=client_ids,
-            start_date=start_date,
-            end_date=end_date,
-            granularity=query_input.granularity,
-            region=regions,
-            business=query_input.business,
-            subbusiness=query_input.subbusiness
-        )
+        if query_input.metric == "revenues":
+            result_df = get_revenues(
+                client_ids=client_ids,
+                start_date=start_date,
+                end_date=end_date,
+                granularity=query_input.granularity,
+                region=regions,
+                business=query_input.business,
+                subbusiness=query_input.subbusiness
+            )
+        else: # metric is "balances"
+            result_df = get_balances(
+                client_ids=client_ids,
+                start_date=start_date,
+                end_date=end_date,
+                granularity=query_input.granularity,
+                region=regions,
+                country=countries,
+                business=query_input.business,
+                subbusiness=query_input.subbusiness
+            )
         
         print("--- SimpleQueryTool Execution Finished ---")
         return result_df 
