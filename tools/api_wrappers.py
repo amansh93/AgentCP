@@ -139,4 +139,47 @@ def get_balances(
         start_date=start_date, end_date=end_date, metric="balances",
         client_ids=client_ids, region=region, country=country,
         business=business, subbusiness=subbusiness, granularity=granularity
-    ) 
+    )
+
+def get_balances_decomposition(
+    client_ids: List[str],
+    start_date: str,
+    end_date: str,
+    granularity: Literal["aggregate", "client", "business", "subbusiness", "region", "country"],
+    region: Optional[List[str]] = None,
+    country: Optional[List[str]] = None,
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
+    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+) -> pd.DataFrame:
+    """
+    Placeholder for the get_balances_decomposition API.
+    Returns a DataFrame breaking down balance changes into MTM and Activity components.
+    """
+    print(f"--- CALLING get_balances_decomposition(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', granularity='{granularity}') ---")
+
+    # This is a simplified mock. A real implementation would fetch data and calculate the decomposition.
+    base_data = _generate_mock_data(
+        start_date=start_date, end_date=end_date, metric="balances",
+        client_ids=client_ids, region=region, country=country,
+        business=business, subbusiness=subbusiness, granularity=granularity
+    )
+
+    if base_data.empty:
+        return pd.DataFrame(columns=[granularity, 'Balance.Start', 'Balance.End', 'Balance.Delta.Total', 'Balance.Delta.MTM', 'Balance.Delta.Activity'])
+
+    # Mock the decomposition columns
+    # In a real scenario, these would be calculated based on a more complex dataset
+    if 'balances' in base_data.columns:
+        base_data = base_data.rename(columns={'balances': 'Balance.End'})
+        base_data['Balance.Start'] = base_data['Balance.End'] * (1 + np.random.uniform(-0.2, 0.2, size=len(base_data)))
+    else:
+         # Handle aggregate case where only one value exists
+        base_data['Balance.End'] = base_data.iloc[:, 0]
+        base_data['Balance.Start'] = base_data['Balance.End'] * (1 + np.random.uniform(-0.2, 0.2, size=len(base_data)))
+
+
+    base_data['Balance.Delta.Total'] = base_data['Balance.End'] - base_data['Balance.Start']
+    base_data['Balance.Delta.MTM'] = base_data['Balance.Delta.Total'] * np.random.uniform(0.3, 0.7, size=len(base_data))
+    base_data['Balance.Delta.Activity'] = base_data['Balance.Delta.Total'] - base_data['Balance.Delta.MTM']
+    
+    return base_data 

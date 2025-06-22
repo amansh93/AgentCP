@@ -3,7 +3,7 @@ import pandas as pd
 from pydantic import BaseModel, Field, validator
 
 from .resolvers import resolve_clients, resolve_dates, resolve_regions, resolve_countries, resolve_fin_or_exec, resolve_primary_or_secondary
-from .api_wrappers import get_revenues, get_balances
+from .api_wrappers import get_revenues, get_balances, get_balances_decomposition
 
 class InformUserInput(BaseModel):
     """Input model for the InformUserTool."""
@@ -21,7 +21,7 @@ class SimpleQueryInput(BaseModel):
     Defines the structured input required by the SimpleQueryTool.
     This model serves as a contract for the Planner.
     """
-    metric: Literal["revenues", "balances"]
+    metric: Literal["revenues", "balances", "balances_decomposition"]
     entities: List[str] = Field(..., description="List of client names or group names, e.g., ['millennium', 'systematic']")
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
@@ -76,6 +76,17 @@ class SimpleQueryTool:
                 region=regions,
                 fin_or_exec=fin_or_exec,
                 primary_or_secondary=primary_or_secondary,
+                business=query_input.business,
+                subbusiness=query_input.subbusiness
+            )
+        elif query_input.metric == "balances_decomposition":
+            result_df = get_balances_decomposition(
+                client_ids=client_ids,
+                start_date=start_date,
+                end_date=end_date,
+                granularity=query_input.granularity,
+                region=regions,
+                country=countries,
                 business=query_input.business,
                 subbusiness=query_input.subbusiness
             )
