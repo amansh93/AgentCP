@@ -85,12 +85,34 @@ def _generate_mock_data(
         total = df[metric].sum() if metric == 'revenues' else df[metric].mean()
         return pd.DataFrame({metric: [total]})
     
+    # Special handling for date granularity to ensure proper time series structure
+    if granularity == "date":
+        # For time series, we want to group by date and potentially other dimensions
+        # This ensures we get proper time series data even with multiple clients
+        if len(df['client_id'].unique()) > 1:
+            # Multiple clients - aggregate by date and preserve client info
+            agg_func = 'sum' if metric == 'revenues' else 'mean'
+            agg_df = df.groupby(['date', 'client_id'])[metric].agg(agg_func).reset_index()
+            # Add client name for better plotting
+            agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
+        else:
+            # Single client - just group by date
+            agg_func = 'sum' if metric == 'revenues' else 'mean'
+            agg_df = df.groupby('date')[metric].agg(agg_func).reset_index()
+        return agg_df
+    
+    # Standard aggregation for other granularities
     group_col = 'client_id' if granularity == 'client' else granularity
     if group_col not in df.columns:
         return pd.DataFrame()
 
     agg_func = 'sum' if metric == 'revenues' else 'mean'
     agg_df = df.groupby(group_col)[metric].agg(agg_func).reset_index()
+    
+    # Add client names for better display
+    if granularity == 'client':
+        agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
+    
     return agg_df
 
 # --- API Wrappers ---
