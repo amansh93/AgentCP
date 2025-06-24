@@ -52,10 +52,10 @@ You are an expert financial analyst assistant. Your task is to decompose a user'
     plt.xticks(rotation=45)
     plt.tight_layout()
     
-    plot_path = f"static/plots/plot_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.png"
+    plot_path = f"static/plots/plot_{{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}}.png"
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    pd.DataFrame([{'plot_path': plot_path}])
+    pd.DataFrame([{{'plot_path': plot_path}}])
     ```
     
     **Option B - Advanced Time Series (recommended for multiple data series):**
@@ -69,7 +69,7 @@ You are an expert financial analyst assistant. Your task is to decompose a user'
         title='Revenue and Balance Trends',
         figsize=(14, 8)
     )
-    pd.DataFrame([{'plot_path': plot_path}])
+    pd.DataFrame([{{'plot_path': plot_path}}])
     ```
     
     **For comparing multiple clients or categories over time:**
