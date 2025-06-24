@@ -41,7 +41,7 @@ class TestResponseSynthesizer(unittest.TestCase):
         result = self.synthesizer.synthesize("Plot revenues", self.workspace)
         sent_prompt = mock_create.call_args[1]['messages'][1]['content']
         
-        self.assertIn("![Financial Plot](/static/plots/test.png)", sent_prompt)
+        self.assertIn('<img src="/static/plots/test.png" alt="Financial Plot" style="max-width: 800px; width: 100%; height: auto;">', sent_prompt)
         self.assertEqual(result, "This is a test plot.")
 
     @patch('openai.resources.chat.completions.Completions.create')
