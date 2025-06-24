@@ -115,6 +115,87 @@ def _generate_mock_data(
     
     return agg_df
 
+def _generate_mock_capital_data(
+    start_date: str, 
+    end_date: str,
+    client_ids: Optional[List[str]] = None,
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
+    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    granularity: Optional[str] = "aggregate"
+) -> pd.DataFrame:
+    """
+    Generates a DataFrame of daily capital/AE (Attributed Equity) data.
+    Capital metrics only support filtering by subbusiness, not by region or country.
+    """
+    # 1. --- Generate Base Data ---
+    dates = pd.to_datetime(pd.date_range(start_date, end_date, freq='D'))
+    base_client_list = client_ids if client_ids else [f"cl_id_{i}" for i in range(5)]
+    
+    businesses = ["Prime", "Equities Ex Prime", "FICC"]
+    subbusinesses = ["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]
+
+    data = []
+    if not base_client_list: 
+        base_client_list = [f"cl_id_{i}" for i in range(5)]
+
+    for date in dates:
+        for client_id in base_client_list:
+            for _ in range(np.random.randint(1, 4)): # Each client has a few random business lines each day
+                data.append({
+                    "date": date, 
+                    "client_id": client_id, 
+                    "business": np.random.choice(businesses),
+                    "subbusiness": np.random.choice(subbusinesses), 
+                    "capital": np.random.randint(50000, 2000000)  # Capital values are typically larger than revenues but smaller than balances
+                })
+
+    if not data:
+        return pd.DataFrame() 
+    
+    df = pd.DataFrame(data)
+
+    # 2. --- Apply Filters ---
+    # Note: Capital only supports client, business, and subbusiness filtering (no region/country)
+    if client_ids:
+        df = df[df['client_id'].isin(client_ids)]
+    if business:
+        if business == "Equities":
+            df = df[df['business'].isin(["Prime", "Equities Ex Prime"])]
+        else:
+            df = df[df['business'] == business]
+    if subbusiness:
+        df = df[df['subbusiness'] == subbusiness]
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # 3. --- Aggregate Data ---
+    if granularity == "aggregate":
+        total = df['capital'].sum()
+        return pd.DataFrame({"capital": [total]})
+    
+    # Special handling for date granularity
+    if granularity == "date":
+        if len(df['client_id'].unique()) > 1:
+            agg_df = df.groupby(['date', 'client_id'])['capital'].sum().reset_index()
+            agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
+        else:
+            agg_df = df.groupby('date')['capital'].sum().reset_index()
+        return agg_df
+    
+    # Standard aggregation for other granularities
+    group_col = 'client_id' if granularity == 'client' else granularity
+    if group_col not in df.columns:
+        return pd.DataFrame()
+
+    agg_df = df.groupby(group_col)['capital'].sum().reset_index()
+    
+    # Add client names for better display
+    if granularity == 'client':
+        agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
+    
+    return agg_df
+
 # --- API Wrappers ---
 
 def get_revenues(
@@ -161,6 +242,27 @@ def get_balances(
         start_date=start_date, end_date=end_date, metric="balances",
         client_ids=client_ids, region=region, country=country,
         business=business, subbusiness=subbusiness, granularity=granularity
+    )
+
+def get_capital(
+    client_ids: List[str],
+    start_date: str,
+    end_date: str,
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"],
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
+    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+) -> pd.DataFrame:
+    """
+    Placeholder for the get_capital API.
+    Returns a pandas DataFrame of capital/AE (Attributed Equity) data, aggregated as specified.
+    Note: Capital data only supports filtering by subbusiness, not by region or country.
+    """
+    print(f"--- CALLING get_capital(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', business='{business}', subbusiness='{subbusiness}', granularity='{granularity}') ---")
+
+    return _generate_mock_capital_data(
+        start_date=start_date, end_date=end_date,
+        client_ids=client_ids, business=business,
+        subbusiness=subbusiness, granularity=granularity
     )
 
 def get_balances_decomposition(
