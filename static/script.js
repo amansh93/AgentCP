@@ -2,9 +2,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
     const chatContainer = document.getElementById('chat-container');
+    const workflowToggle = document.getElementById('workflow-toggle');
+    const toggleTexts = document.querySelectorAll('.toggle-text');
+
+    // Initialize toggle state
+    updateToggleLabels();
+
+    // Add toggle change listener
+    workflowToggle.addEventListener('change', updateToggleLabels);
+
+    function updateToggleLabels() {
+        const isPerformanceFlows = workflowToggle.checked;
+        toggleTexts[0].classList.toggle('active', !isPerformanceFlows); // Balances/Revs/Capital
+        toggleTexts[1].classList.toggle('active', isPerformanceFlows);   // Performance/Flows
+    }
 
     // Add a welcome message
-    appendMessage("Hello! I'm NEXA. How can I help you with your data today?", 'bot');
+    appendMessage("Hello! I'm NEXA, your new next-gen client analytics digital assistant. How can I help you with your data today? Ask me anything....", 'bot');
 
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -14,6 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessage(query, 'user');
         chatInput.value = '';
         
+        const workflowToggle = document.getElementById('workflow-toggle');
+        const usePerformanceFlows = workflowToggle.checked;
+        
         const thinkingMessage = appendMessage('Thinking...', 'bot');
 
         try {
@@ -22,7 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ query }),
+                body: JSON.stringify({ 
+                    query: query,
+                    use_performance_flows: usePerformanceFlows 
+                }),
             });
 
             chatContainer.removeChild(thinkingMessage);
