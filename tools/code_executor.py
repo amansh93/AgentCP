@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import time
 
 from agent.workspace import AgentWorkspace
 
@@ -84,6 +85,68 @@ def execute_python_code(workspace: AgentWorkspace, code: str) -> AgentWorkspace:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()  # Important: close the figure to free memory
         
+        # CRITICAL: Verify the file was actually saved where expected
+        if not os.path.exists(save_path):
+            # If the file wasn't saved at the expected location, check for temp files
+            import tempfile
+            temp_dir = tempfile.gettempdir()
+            print(f"WARNING: Plot was not saved to expected location: {save_path}")
+            print(f"Check temp directory: {temp_dir}")
+            
+            # Try to find matplotlib temp files
+            import glob
+            temp_files = glob.glob(os.path.join(temp_dir, "*.png"))
+            recent_temp_files = [f for f in temp_files if os.path.getmtime(f) > (time.time() - 60)]  # Files created in last minute
+            
+            if recent_temp_files:
+                actual_file = max(recent_temp_files, key=os.path.getmtime)  # Most recent
+                print(f"Found recent temp file: {actual_file}")
+                print(f"Attempting to move to correct location...")
+                
+                try:
+                    import shutil
+                    shutil.move(actual_file, save_path)
+                    print(f"Successfully moved file to: {save_path}")
+                except Exception as move_error:
+                    print(f"Failed to move file: {move_error}")
+                    save_path = actual_file  # Use the temp location as fallback
+                    print(f"Using temp file location: {save_path}")
+            else:
+                # Generate a new unique filename and try again
+                timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S_%f')[:-3]  # Include microseconds
+                backup_path = f'static/plots/timeseries_backup_{timestamp}.png'
+                print(f"No temp files found. Regenerating plot at: {backup_path}")
+                
+                # Re-create the plot with new path
+                plt.figure(figsize=figsize)
+                for col in value_cols:
+                    if col in df.columns:
+                        plt.plot(df[date_col], df[col], marker='o', label=col, linewidth=2)
+                
+                plt.title(title, fontsize=14, fontweight='bold')
+                plt.xlabel('Date', fontsize=12)
+                plt.ylabel('Value', fontsize=12)
+                plt.legend()
+                plt.grid(True, alpha=0.3)
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                
+                os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+                plt.savefig(backup_path, dpi=300, bbox_inches='tight')
+                plt.close()
+                
+                if os.path.exists(backup_path):
+                    save_path = backup_path
+                    print(f"Successfully saved backup plot to: {save_path}")
+                else:
+                    raise Exception(f"Failed to save plot at both {save_path} and {backup_path}")
+        else:
+            print(f"✓ Plot successfully saved to: {save_path}")
+        
+        # IMPORTANT: Print the actual file location for LLM visibility
+        print(f"📁 PLOT FILE LOCATION: {save_path}")
+        print(f"   Use this exact path in your dataframe: {save_path}")
+        
         return save_path
     
     # Create a local scope for the execution, pre-populated with workspace data and utilities
@@ -104,6 +167,33 @@ def execute_python_code(workspace: AgentWorkspace, code: str) -> AgentWorkspace:
         
     # Update the workspace with the potentially modified dataframes
     workspace.dataframes = local_scope['dataframes']
+    
+    # CRITICAL: Validate any plot files referenced in dataframes actually exist
+    for df_name, df in workspace.dataframes.items():
+        if isinstance(df, pd.DataFrame) and 'plot_path' in df.columns:
+            for plot_path in df['plot_path'].dropna():
+                if not os.path.exists(plot_path):
+                    print(f"WARNING: Plot file does not exist at reported path: {plot_path}")
+                    
+                    # Try to find the file in temp directories
+                    import tempfile
+                    import glob
+                    temp_dir = tempfile.gettempdir()
+                    temp_files = glob.glob(os.path.join(temp_dir, "*.png"))
+                    recent_temp_files = [f for f in temp_files if os.path.getmtime(f) > (time.time() - 120)]  # Files created in last 2 minutes
+                    
+                    if recent_temp_files:
+                        actual_file = max(recent_temp_files, key=os.path.getmtime)
+                        print(f"Found potential temp file: {actual_file}")
+                        print(f"This file was likely created instead of: {plot_path}")
+                        
+                        # Update the dataframe with the actual file location
+                        df.loc[df['plot_path'] == plot_path, 'plot_path'] = actual_file
+                        print(f"Updated dataframe to reference actual file location: {actual_file}")
+                    else:
+                        print(f"ERROR: No recent temp files found. Plot may have failed silently.")
+                else:
+                    print(f"✓ Verified plot file exists: {plot_path}")
     
     print("--- Code Execution Finished ---")
     return workspace 

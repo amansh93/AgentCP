@@ -1,6 +1,7 @@
 import json
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 from .models import MultiStepPlan
 from .llm_client import get_llm_client
@@ -36,9 +37,27 @@ You are an expert financial analyst assistant. Your task is to decompose a user'
 7.  **Choose Granularity Wisely**: When a user asks for a breakdown, comparison, or data 'by' a certain dimension (e.g., 'revenues by region', 'compare financing vs execution'), you MUST set the `granularity` parameter to that dimension (e.g., `'region'`, `'fin_or_exec'`). Use `'aggregate'` only when the user explicitly asks for a single total number and no breakdown is required.
 8.  **Time Series Plotting**: For time series plots, you must fetch data with `granularity="date"` to get daily data points. The system provides several approaches for plotting:
     
-    **Option A - Simple Plotting (for basic charts):**
+    **PREFERRED APPROACH - Use plot_timeseries utility (HIGHLY RECOMMENDED):**
     ```python
-    # Basic approach - make sure to handle datetime and styling
+    # Always use the built-in plot_timeseries utility - it handles file naming automatically
+    # IMPORTANT: The function returns the ACTUAL saved file path
+    plot_df = dataframes['your_data']
+    actual_plot_path = plot_timeseries(
+        df=plot_df,
+        date_col='date',
+        value_cols=['revenues', 'balances'],  # or None to auto-detect
+        title='Revenue and Balance Trends',
+        figsize=(14, 8)
+        # save_path is auto-generated with timestamp - DO NOT override unless absolutely necessary
+    )
+    # Store the ACTUAL returned path (not a hardcoded one)
+    dataframes['plot_result'] = pd.DataFrame([{{'plot_path': actual_plot_path}}])
+    print("Plot saved at:", actual_plot_path)  # Verify the location
+    ```
+    
+    **MANUAL PLOTTING (Use only when plot_timeseries is insufficient):**
+    ```python
+    # If you must use manual plotting, ALWAYS use timestamp-based filenames
     plot_df = dataframes['your_data']
     plot_df['date'] = pd.to_datetime(plot_df['date'])
     plot_df = plot_df.sort_values('date')
@@ -52,32 +71,40 @@ You are an expert financial analyst assistant. Your task is to decompose a user'
     plt.xticks(rotation=45)
     plt.tight_layout()
     
-    plot_path = f"static/plots/plot_{{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}}.png"
+    # CRITICAL: Always use timestamp-based filenames, NEVER semantic names
+    import os
+    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+    plot_path = f"static/plots/plot_{{timestamp}}.png"
+    
+    # Ensure directory exists before saving
+    os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+    
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     plt.close()
-    pd.DataFrame([{{'plot_path': plot_path}}])
+    
+    # IMPORTANT: Verify and print the actual saved location
+    if os.path.exists(plot_path):
+        print("📁 PLOT FILE LOCATION:", plot_path)
+        actual_path = plot_path
+    else:
+        print("WARNING: File not saved at expected location:", plot_path)
+        # Handle the error or find actual location
+        actual_path = plot_path  # or implement recovery logic
+    
+    dataframes['plot_result'] = pd.DataFrame([{{'plot_path': actual_path}}])
+    print("Final plot path stored:", actual_path)  # Double verification
     ```
     
-    **Option B - Advanced Time Series (recommended for multiple data series):**
-    ```python
-    # Using the built-in plot_timeseries utility for professional results
-    plot_df = dataframes['your_data']
-    plot_path = plot_timeseries(
-        df=plot_df,
-        date_col='date',
-        value_cols=['revenues', 'balances'],  # or None to auto-detect
-        title='Revenue and Balance Trends',
-        figsize=(14, 8)
-    )
-    pd.DataFrame([{{'plot_path': plot_path}}])
-    ```
+    **IMPORTANT FILE NAMING RULES:**
+    - NEVER use semantic filenames like "france_balances_total.png"
+    - ALWAYS use timestamp-based filenames for uniqueness
+    - ALWAYS ensure the directory exists before saving
+    - ALWAYS use the plot_timeseries utility when possible
     
     **For comparing multiple clients or categories over time:**
     - Fetch data with multiple entities and `granularity="date"`
     - Pivot or reshape data to have date as index and each client/category as a column
     - Use the time series plotting approaches above
-    
-    Always output a DataFrame containing the plot path as the final line of your code.
 9.  **Validate Dimensions**: Before planning a `data_fetch` call, ensure the requested dimensions are supported for the specified metric.
     *   `revenues` can be filtered by `region`, but **NOT** by `country`.
     *   `balances` can be filtered by both `region` and `country`.
@@ -132,7 +159,7 @@ GOOD_PLAN: {{
       "tool_name": "code_executor",
       "summary": "Now, I will generate a professional time series plot of the revenue data.",
       "parameters": {{
-        "code": "plot_df = dataframes['millennium_revenue']; plot_path = plot_timeseries(df=plot_df, date_col='date', value_cols=['revenues'], title='Millennium Revenue Trend Since 2023', figsize=(14, 8)); dataframes['plot_result'] = pd.DataFrame([{{'plot_path': plot_path}}])"
+        "code": "plot_df = dataframes['millennium_revenue']; actual_plot_path = plot_timeseries(df=plot_df, date_col='date', value_cols=['revenues'], title='Millennium Revenue Trend Since 2023', figsize=(14, 8)); dataframes['plot_result'] = pd.DataFrame([{{'plot_path': actual_plot_path}}]); print('Plot created at:', actual_plot_path)"
       }}
     }}
   ]
@@ -163,7 +190,7 @@ GOOD_PLAN: {{
       "tool_name": "code_executor",
       "summary": "Transform the data and create a comparison time series plot.",
       "parameters": {{
-        "code": "plot_df = dataframes['client_revenues']; pivot_df = plot_df.pivot_table(index='date', columns='client_id', values='revenues', aggfunc='sum').reset_index(); plot_path = plot_timeseries(df=pivot_df, date_col='date', title='Revenue Comparison: Millennium vs Citadel', figsize=(14, 8)); dataframes['plot_result'] = pd.DataFrame([{{'plot_path': plot_path}}])"
+        "code": "plot_df = dataframes['client_revenues']; pivot_df = plot_df.pivot_table(index='date', columns='client_id', values='revenues', aggfunc='sum').reset_index(); actual_plot_path = plot_timeseries(df=pivot_df, date_col='date', title='Revenue Comparison: Millennium vs Citadel', figsize=(14, 8)); dataframes['plot_result'] = pd.DataFrame([{{'plot_path': actual_plot_path}}]); print('Comparison plot saved at:', actual_plot_path)"
       }}
     }}
   ]
