@@ -21,7 +21,7 @@ class SimpleQueryInput(BaseModel):
     Defines the structured input required by the SimpleQueryTool.
     This model serves as a contract for the Planner.
     """
-    metric: Literal["revenues", "balances", "balances_decomposition", "capital"]
+    metric: Literal["revenues", "balances", "balances_decomposition", "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE"]
     entities: List[str] = Field(..., description="List of client names or group names, e.g., ['millennium', 'systematic']")
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
@@ -90,12 +90,13 @@ class SimpleQueryTool:
                 business=query_input.business,
                 subbusiness=query_input.subbusiness
             )
-        elif query_input.metric == "capital":
+        elif query_input.metric in ["Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE"]:
             result_df = get_capital(
                 client_ids=client_ids,
                 start_date=start_date,
                 end_date=end_date,
                 granularity=query_input.granularity,
+                metric=query_input.metric,
                 business=query_input.business,
                 subbusiness=query_input.subbusiness
             )

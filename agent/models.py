@@ -5,7 +5,7 @@ from typing import List, Literal, Optional, Union
 
 class DataFetchParameters(BaseModel):
     """Parameters for fetching data from our APIs."""
-    metric: Literal["revenues", "balances", "balances_decomposition", "capital"]
+    metric: Literal["revenues", "balances", "balances_decomposition", "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE"]
     entities: List[str]
     date_description: str
     granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
