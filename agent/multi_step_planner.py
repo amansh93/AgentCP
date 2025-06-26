@@ -293,6 +293,47 @@ GOOD_PLAN: {{
 }}
 --- END EXAMPLE 6 ---
 
+--- FEW-SHOT EXAMPLE 7 (Balance Type Analysis) ---
+USER_QUERY: "Show me debit balances for PB clients this year"
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch debit balances for PB subbusiness this year.",
+            "parameters": {{
+                "metric": "balances",
+                "entities": ["all clients"],
+                "date_description": "this year",
+                "granularity": "aggregate",
+                "subbusiness": "PB",
+                "balance_type": "Debit",
+                "output_variable": "pb_debit_balances"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 7 ---
+
+--- FEW-SHOT EXAMPLE 8 (Balance Type by Granularity) ---
+USER_QUERY: "Break down balance types for SPG clients last quarter"
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch balance data broken down by balance type for SPG subbusiness last quarter.",
+            "parameters": {{
+                "metric": "balances",
+                "entities": ["all clients"],
+                "date_description": "last quarter",
+                "granularity": "balance_type",
+                "subbusiness": "SPG",
+                "output_variable": "spg_balance_types"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 8 ---
+
 Based on these principles and examples, generate a plan for the user's query.
 
 Your available tools are:
@@ -301,11 +342,12 @@ Your available tools are:
    - For capital-related data, you can use these specific metrics: "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE". Each metric can only be filtered by `business` and `subbusiness`, not by region or country.
    - The `regions` parameter can be a list of: "AMERICAS", "EMEA", "ASIA", "NA", or aliases like "Europe". "global" is also a valid option.
    - The `countries` parameter can be a list of countries, e.g. ["USA", "GBR"]. (For 'balances' metric ONLY).
+   - The `balance_type` parameter filters by balance type. For PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts". For SPG subbusiness: "Synthetic Longs", "Synthetic Shorts". Invalid combinations return empty data. (For 'balances' metric ONLY).
    - The `fin_or_exec` parameter filters by financing or execution revenue. It can be a list containing "Financing" or "Execution". Aliases for "Execution" are "commissions" or "comms". (For 'revenues' metric ONLY).
    - The `primary_or_secondary` parameter filters by primary or secondary revenue. It can be a list containing "Primary" or "Secondary". (For 'revenues' metric ONLY).
    - The `business` parameter can be one of: "Prime", "Equities Ex Prime", "FICC".
    - The `subbusiness` parameter can be one of: "PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro".
-   - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only).
+   - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only), "balance_type" (balances only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only).
    - For capital-related metrics (Total RWA, Portfolio RWA, Total AE, etc.), supported granularities are: "aggregate", "client", "date", "business", "subbusiness".
 2. `describe_dataframe`: To see the schema (columns and data types) of a dataframe that you have fetched.
 3. `code_executor`: To perform any kind of analysis on the dataframes using Python and the pandas library. The final line of your code block MUST be an expression that results in a pandas DataFrame, which will be saved back to the workspace.

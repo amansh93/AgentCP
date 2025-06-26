@@ -15,11 +15,17 @@ def _generate_mock_data(
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
+    balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
     granularity: Optional[str] = "aggregate"
 ) -> pd.DataFrame:
     """
     Generates a DataFrame of daily data, then filters and aggregates it based on the provided parameters.
     This function simulates a real-world API that performs filtering and aggregation on the server side.
+    
+    balance_type filtering rules:
+    - PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts"
+    - SPG subbusiness: "Synthetic Longs", "Synthetic Shorts"
+    - Invalid combinations return empty DataFrame
     """
     # 1. --- Generate Base Data ---
     dates = pd.to_datetime(pd.date_range(start_date, end_date, freq='D'))
@@ -44,12 +50,25 @@ def _generate_mock_data(
     for date in dates:
         for client_id in base_client_list:
             for _ in range(np.random.randint(1, 4)): # Each client has a few random business lines each day
+                chosen_subbusiness = np.random.choice(subbusinesses)
+                chosen_region = np.random.choice(regions)
+                
+                # Generate appropriate balance_type based on subbusiness
+                if chosen_subbusiness in ["PB", "Clearing"]:
+                    balance_type_options = ["Debit", "Credit", "Physical Shorts"]
+                elif chosen_subbusiness == "SPG":
+                    balance_type_options = ["Synthetic Longs", "Synthetic Shorts"]
+                else:
+                    # For other subbusinesses, use PB-style balance types as default
+                    balance_type_options = ["Debit", "Credit", "Physical Shorts"]
+                
                 data.append({
                     "date": date, "client_id": client_id, "business": np.random.choice(businesses),
-                    "subbusiness": np.random.choice(subbusinesses), "region": np.random.choice(regions),
-                    "country": np.random.choice(country_map.get(np.random.choice(regions), ["USA"])),
+                    "subbusiness": chosen_subbusiness, "region": chosen_region,
+                    "country": np.random.choice(country_map.get(chosen_region, ["USA"])),
                     "fin_or_exec": np.random.choice(fin_or_exec_options),
                     "primary_or_secondary": np.random.choice(primary_or_secondary_options),
+                    "balance_type": np.random.choice(balance_type_options),
                     "revenues": np.random.randint(1000, 50000), "balances": np.random.randint(100000, 5000000)
                 })
 
@@ -76,6 +95,22 @@ def _generate_mock_data(
             df = df[df['business'] == business]
     if subbusiness:
         df = df[df['subbusiness'] == subbusiness]
+    
+    # Apply balance_type filter with validation
+    if balance_type:
+        # First validate that balance_type is compatible with subbusiness
+        if not df.empty:
+            unique_subbusinesses = df['subbusiness'].unique()
+            
+            # Check for invalid combinations and return empty DataFrame if found
+            for sb in unique_subbusinesses:
+                if sb in ["PB", "Clearing"] and balance_type not in ["Debit", "Credit", "Physical Shorts"]:
+                    return pd.DataFrame()  # Invalid combination
+                elif sb == "SPG" and balance_type not in ["Synthetic Longs", "Synthetic Shorts"]:
+                    return pd.DataFrame()  # Invalid combination
+        
+        # Apply the filter if validation passes
+        df = df[df['balance_type'] == balance_type]
 
     if df.empty:
         return pd.DataFrame()
@@ -246,22 +281,27 @@ def get_balances(
     client_ids: List[str],
     start_date: str,
     end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country"],
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "balance_type"],
     region: Optional[List[str]] = None,
     country: Optional[List[str]] = None,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
 ) -> pd.DataFrame:
     """
     Placeholder for the get_balances API.
     Returns a pandas DataFrame of balance data, aggregated as specified.
+    
+    balance_type parameter supports:
+    - PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts"
+    - SPG subbusiness: "Synthetic Longs", "Synthetic Shorts"
     """
-    print(f"--- CALLING get_balances(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', business='{business}', subbusiness='{subbusiness}', granularity='{granularity}') ---")
+    print(f"--- CALLING get_balances(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', business='{business}', subbusiness='{subbusiness}', balance_type='{balance_type}', granularity='{granularity}') ---")
 
     return _generate_mock_data(
         start_date=start_date, end_date=end_date, metric="balances",
         client_ids=client_ids, region=region, country=country,
-        business=business, subbusiness=subbusiness, granularity=granularity
+        business=business, subbusiness=subbusiness, balance_type=balance_type, granularity=granularity
     )
 
 def get_capital(

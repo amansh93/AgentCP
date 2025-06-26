@@ -26,11 +26,12 @@ class SimpleQueryInput(BaseModel):
     date_description: str = Field(..., description="A natural language description of the date range, e.g., 'Q1 2024'")
     regions: Optional[List[str]] = Field(None, description="A list of regions or aliases to filter on, e.g., ['Europe', 'AMERICAS', 'global']")
     countries: Optional[List[str]] = Field(None, alias="country", description="A list of countries or aliases to filter on (for balances only), e.g., ['UK', 'United States']")
+    balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = Field(None, description="Filter for balance type (for balances metric ONLY). PB/Clearing supports: Debit, Credit, Physical Shorts. SPG supports: Synthetic Longs, Synthetic Shorts.")
     fin_or_exec: Optional[List[str]] = Field(None, description="Filter for financing or execution revenues (for revenues metric ONLY). Aliases: 'commissions', 'comms'.")
     primary_or_secondary: Optional[List[str]] = Field(None, description="Filter for primary or secondary revenues (for revenues metric ONLY).")
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "fin_or_exec", "primary_or_secondary"]
+    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "balance_type", "fin_or_exec", "primary_or_secondary"]
 
     @validator('business', 'subbusiness', pre=True)
     def empty_str_to_none(cls, v: Any) -> Optional[Any]:
@@ -109,7 +110,8 @@ class SimpleQueryTool:
                 region=regions,
                 country=countries,
                 business=query_input.business,
-                subbusiness=query_input.subbusiness
+                subbusiness=query_input.subbusiness,
+                balance_type=query_input.balance_type
             )
         
         print("--- SimpleQueryTool Execution Finished ---")

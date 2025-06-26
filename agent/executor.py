@@ -29,6 +29,13 @@ class Executor:
         Iterates through a dynamic plan, executing each step and returning
         the final workspace and a list of step summaries.
         """
+        # CRITICAL: Reset workspace to prevent data corruption between queries
+        old_dataframes = list(self.workspace.dataframes.keys()) if hasattr(self, 'workspace') else []
+        self.workspace = AgentWorkspace()
+        if old_dataframes:
+            print(f"--- Executor: Workspace reset (cleared {len(old_dataframes)} old dataframes: {old_dataframes}) ---")
+        else:
+            print("--- Executor: Workspace reset for new query ---")
         plan_steps = list(initial_plan.plan)
         summaries = []
         current_step_index = 0
