@@ -334,6 +334,47 @@ GOOD_PLAN: {{
 }}
 --- END EXAMPLE 8 ---
 
+--- FEW-SHOT EXAMPLE 9 (Multiple Balance Types Analysis) ---
+USER_QUERY: "Find clients with debits exceeding shorts in PB business"
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch debit balances for PB business by client.",
+            "parameters": {{
+                "metric": "balances",
+                "entities": ["all clients"],
+                "date_description": "recent period",
+                "granularity": "client",
+                "subbusiness": "PB",
+                "balance_type": "Debit",
+                "output_variable": "pb_debits"
+            }}
+        }},
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch physical shorts balances for PB business by client.",
+            "parameters": {{
+                "metric": "balances",
+                "entities": ["all clients"],
+                "date_description": "recent period",
+                "granularity": "client",
+                "subbusiness": "PB",
+                "balance_type": "Physical Shorts",
+                "output_variable": "pb_shorts"
+            }}
+        }},
+        {{
+            "tool_name": "code_executor",
+            "summary": "Calculate clients with debits exceeding shorts and rank them.",
+            "parameters": {{
+                "code": "debits_df = dataframes['pb_debits']; shorts_df = dataframes['pb_shorts']; merged_df = debits_df.merge(shorts_df, on='client_id', suffixes=('_debit', '_short')); merged_df['excess'] = merged_df['balances_debit'] - merged_df['balances_short']; result_df = merged_df[merged_df['excess'] > 0].sort_values('excess', ascending=False); dataframes['clients_excess_debits'] = result_df"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 9 ---
+
 Based on these principles and examples, generate a plan for the user's query.
 
 Your available tools are:
@@ -342,7 +383,7 @@ Your available tools are:
    - For capital-related data, you can use these specific metrics: "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE". Each metric can only be filtered by `business` and `subbusiness`, not by region or country.
    - The `regions` parameter can be a list of: "AMERICAS", "EMEA", "ASIA", "NA", or aliases like "Europe". "global" is also a valid option.
    - The `countries` parameter can be a list of countries, e.g. ["USA", "GBR"]. (For 'balances' metric ONLY).
-   - The `balance_type` parameter filters by balance type. For PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts". For SPG subbusiness: "Synthetic Longs", "Synthetic Shorts". Invalid combinations return empty data. (For 'balances' metric ONLY).
+   - The `balance_type` parameter filters by balance type (single value only). For PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts". For SPG subbusiness: "Synthetic Longs", "Synthetic Shorts". Invalid combinations return empty data. To compare multiple balance types, fetch them in separate steps. (For 'balances' metric ONLY).
    - The `fin_or_exec` parameter filters by financing or execution revenue. It can be a list containing "Financing" or "Execution". Aliases for "Execution" are "commissions" or "comms". (For 'revenues' metric ONLY).
    - The `primary_or_secondary` parameter filters by primary or secondary revenue. It can be a list containing "Primary" or "Secondary". (For 'revenues' metric ONLY).
    - The `business` parameter can be one of: "Prime", "Equities Ex Prime", "FICC".
