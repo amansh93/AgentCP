@@ -4,12 +4,94 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatContainer = document.getElementById('chat-container');
     const workflowToggle = document.getElementById('workflow-toggle');
     const toggleTexts = document.querySelectorAll('.toggle-text');
+    const footerContainer = document.getElementById('footer-container');
+    const resizeHandle = document.getElementById('resize-handle');
 
     // Initialize toggle state
     updateToggleLabels();
 
     // Add toggle change listener
     workflowToggle.addEventListener('change', updateToggleLabels);
+
+    // Auto-expanding textarea functionality
+    function autoExpandTextarea() {
+        chatInput.style.height = 'auto';
+        const scrollHeight = chatInput.scrollHeight;
+        const maxHeight = parseFloat(window.getComputedStyle(chatInput).maxHeight);
+        
+        if (scrollHeight <= maxHeight) {
+            chatInput.style.height = Math.max(48, scrollHeight) + 'px';
+        } else {
+            chatInput.style.height = maxHeight + 'px';
+        }
+    }
+
+    // Add input event listener for auto-expanding
+    chatInput.addEventListener('input', autoExpandTextarea);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    });
+
+    // Resizable footer functionality
+    let isResizing = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    function startResize(clientY) {
+        isResizing = true;
+        startY = clientY;
+        startHeight = footerContainer.offsetHeight;
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+    }
+
+    function doResize(clientY) {
+        if (!isResizing) return;
+        
+        const deltaY = startY - clientY;
+        const newHeight = Math.max(80, Math.min(window.innerHeight * 0.4, startHeight + deltaY));
+        
+        footerContainer.style.height = newHeight + 'px';
+        autoExpandTextarea(); // Readjust textarea height
+    }
+
+    function endResize() {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    }
+
+    // Mouse events
+    resizeHandle.addEventListener('mousedown', (e) => {
+        startResize(e.clientY);
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        doResize(e.clientY);
+    });
+
+    document.addEventListener('mouseup', endResize);
+
+    // Touch events for mobile
+    resizeHandle.addEventListener('touchstart', (e) => {
+        startResize(e.touches[0].clientY);
+        e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        if (isResizing) {
+            doResize(e.touches[0].clientY);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    document.addEventListener('touchend', endResize);
 
     function updateToggleLabels() {
         const isPerformanceFlows = workflowToggle.checked;
@@ -27,6 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         appendMessage(query, 'user');
         chatInput.value = '';
+        chatInput.style.height = '48px'; // Reset textarea height
         
         const workflowToggle = document.getElementById('workflow-toggle');
         const usePerformanceFlows = workflowToggle.checked;
