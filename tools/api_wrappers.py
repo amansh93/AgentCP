@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from typing import List, Literal, Optional
+from datetime import datetime, timedelta
+import re
 
 # --- Main Data Generation & Filtering Function ---
 
@@ -16,17 +18,22 @@ def _generate_mock_data(
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
     balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
-    granularity: Optional[str] = "aggregate"
+    row_granularity: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
     Generates a DataFrame of daily data, then filters and aggregates it based on the provided parameters.
     This function simulates a real-world API that performs filtering and aggregation on the server side.
+    
+    row_granularity now accepts a list of up to 2 dimensions for multi-dimensional grouping.
     
     balance_type filtering rules:
     - PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts"
     - SPG subbusiness: "Synthetic Longs", "Synthetic Shorts"
     - Invalid combinations return empty DataFrame
     """
+    if row_granularity is None:
+        row_granularity = ["aggregate"]
+        
     # 1. --- Generate Base Data ---
     dates = pd.to_datetime(pd.date_range(start_date, end_date, freq='D'))
     base_client_list = client_ids if client_ids else [f"cl_id_{i}" for i in range(5)]
@@ -115,138 +122,57 @@ def _generate_mock_data(
     if df.empty:
         return pd.DataFrame()
 
-    # 3. --- Aggregate Data ---
-    if granularity == "aggregate":
+    # 3. --- Aggregate Data Based on Row Granularity ---
+    if "aggregate" in row_granularity:
         total = df[metric].sum() if metric == 'revenues' else df[metric].mean()
         return pd.DataFrame({metric: [total]})
     
+    # Map granularity values to actual column names
+    granularity_column_map = {
+        "client": "client_id",
+        "date": "date",
+        "business": "business",
+        "subbusiness": "subbusiness",
+        "region": "region",
+        "country": "country",
+        "balance_type": "balance_type",
+        "fin_or_exec": "fin_or_exec",
+        "primary_or_secondary": "primary_or_secondary"
+    }
+    
+    # Build group columns from row_granularity
+    group_cols = []
+    for granularity in row_granularity:
+        if granularity in granularity_column_map:
+            col_name = granularity_column_map[granularity]
+            if col_name in df.columns:
+                group_cols.append(col_name)
+    
+    if not group_cols:
+        return pd.DataFrame()
+
     # Special handling for date granularity to ensure proper time series structure
-    if granularity == "date":
-        # For time series, we want to group by date and potentially other dimensions
-        # This ensures we get proper time series data even with multiple clients
-        if len(df['client_id'].unique()) > 1:
-            # Multiple clients - aggregate by date and preserve client info
-            agg_func = 'sum' if metric == 'revenues' else 'mean'
-            agg_df = df.groupby(['date', 'client_id'])[metric].agg(agg_func).reset_index()
+    if "date" in row_granularity:
+        # For time series, we want to handle multiple clients properly
+        agg_func = 'sum' if metric == 'revenues' else 'mean'
+        
+        if len(df['client_id'].unique()) > 1 and "client_id" not in group_cols:
+            # Multiple clients but client not in grouping - add client to preserve structure
+            group_cols_with_client = group_cols + ["client_id"]
+            agg_df = df.groupby(group_cols_with_client)[metric].agg(agg_func).reset_index()
             # Add client name for better plotting
             agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
         else:
-            # Single client - just group by date
-            agg_func = 'sum' if metric == 'revenues' else 'mean'
-            agg_df = df.groupby('date')[metric].agg(agg_func).reset_index()
+            # Standard grouping
+            agg_df = df.groupby(group_cols)[metric].agg(agg_func).reset_index()
         return agg_df
     
-    # Standard aggregation for other granularities
-    group_col = 'client_id' if granularity == 'client' else granularity
-    if group_col not in df.columns:
-        return pd.DataFrame()
-
+    # Standard aggregation for non-date granularities
     agg_func = 'sum' if metric == 'revenues' else 'mean'
-    agg_df = df.groupby(group_col)[metric].agg(agg_func).reset_index()
+    agg_df = df.groupby(group_cols)[metric].agg(agg_func).reset_index()
     
-    # Add client names for better display
-    if granularity == 'client':
-        agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
-    
-    return agg_df
-
-def _generate_mock_capital_data(
-    start_date: str, 
-    end_date: str,
-    metric: str = "Total AE",
-    client_ids: Optional[List[str]] = None,
-    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
-    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
-    granularity: Optional[str] = "aggregate"
-) -> pd.DataFrame:
-    """
-    Generates a DataFrame of daily capital data for the specified metric.
-    Supports: "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", 
-    "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE".
-    Capital metrics only support filtering by subbusiness, not by region or country.
-    """
-    # 1. --- Generate Base Data ---
-    dates = pd.to_datetime(pd.date_range(start_date, end_date, freq='D'))
-    base_client_list = client_ids if client_ids else [f"cl_id_{i}" for i in range(5)]
-    
-    businesses = ["Prime", "Equities Ex Prime", "FICC"]
-    subbusinesses = ["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]
-
-    data = []
-    if not base_client_list: 
-        base_client_list = [f"cl_id_{i}" for i in range(5)]
-
-    for date in dates:
-        for client_id in base_client_list:
-            for _ in range(np.random.randint(1, 4)): # Each client has a few random business lines each day
-                # Generate different value ranges based on metric type
-                if "RWA" in metric:
-                    # RWA values are typically larger than AE
-                    value = np.random.randint(100000, 5000000)
-                elif metric in ["Balance Sheet", "Supplemental Balance Sheet"]:
-                    # Balance sheet values are typically very large
-                    value = np.random.randint(1000000, 20000000)
-                elif "AE" in metric or "Equity" in metric:
-                    # Attributed Equity values
-                    value = np.random.randint(50000, 2000000)
-                elif "GSIB" in metric:
-                    # GSIB Points are typically smaller numbers
-                    value = np.random.randint(10, 1000)
-                else:
-                    # Default capital values
-                    value = np.random.randint(50000, 2000000)
-                
-                data.append({
-                    "date": date, 
-                    "client_id": client_id, 
-                    "business": np.random.choice(businesses),
-                    "subbusiness": np.random.choice(subbusinesses), 
-                    metric: value
-                })
-
-    if not data:
-        return pd.DataFrame() 
-    
-    df = pd.DataFrame(data)
-
-    # 2. --- Apply Filters ---
-    # Note: Capital only supports client, business, and subbusiness filtering (no region/country)
-    if client_ids:
-        df = df[df['client_id'].isin(client_ids)]
-    if business:
-        if business == "Equities":
-            df = df[df['business'].isin(["Prime", "Equities Ex Prime"])]
-        else:
-            df = df[df['business'] == business]
-    if subbusiness:
-        df = df[df['subbusiness'] == subbusiness]
-
-    if df.empty:
-        return pd.DataFrame()
-
-    # 3. --- Aggregate Data ---
-    if granularity == "aggregate":
-        total = df[metric].sum()
-        return pd.DataFrame({metric: [total]})
-    
-    # Special handling for date granularity
-    if granularity == "date":
-        if len(df['client_id'].unique()) > 1:
-            agg_df = df.groupby(['date', 'client_id'])[metric].sum().reset_index()
-            agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
-        else:
-            agg_df = df.groupby('date')[metric].sum().reset_index()
-        return agg_df
-    
-    # Standard aggregation for other granularities
-    group_col = 'client_id' if granularity == 'client' else granularity
-    if group_col not in df.columns:
-        return pd.DataFrame()
-
-    agg_df = df.groupby(group_col)[metric].sum().reset_index()
-    
-    # Add client names for better display
-    if granularity == 'client':
+    # Add client names for better display if client is in the grouping
+    if 'client_id' in group_cols:
         agg_df['client_name'] = agg_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
     
     return agg_df
@@ -254,119 +180,245 @@ def _generate_mock_capital_data(
 # --- API Wrappers ---
 
 def get_revenues(
-    client_ids: List[str],
-    start_date: str,
-    end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "fin_or_exec", "primary_or_secondary"],
-    region: Optional[List[str]] = None,
+    entities: List[str],
+    date_range: str,
+    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
+    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    regions: Optional[List[str]] = None,
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
-    business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
-    subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    row_granularity: List[str] = ["aggregate"],
+    col_granularity: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
-    Placeholder for the get_revenues API.
-    Returns a pandas DataFrame of revenue data, aggregated as specified.
+    Retrieves revenue data for specific entities and date range.
+    Now supports multi-dimensional row_granularity with up to 2 dimensions.
     """
-    print(f"--- CALLING get_revenues(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', business='{business}', subbusiness='{subbusiness}', granularity='{granularity}') ---")
-    
-    return _generate_mock_data(
-        start_date=start_date, end_date=end_date, metric="revenues",
-        client_ids=client_ids, region=region, fin_or_exec=fin_or_exec,
-        primary_or_secondary=primary_or_secondary, business=business,
-        subbusiness=subbusiness, granularity=granularity
-    )
+    try:
+        start_date, end_date = _parse_date_range(date_range)
+        client_ids = [_resolve_client_name(entity) for entity in entities]
+        
+        mock_df = _generate_mock_data(
+            start_date, end_date, "revenues", client_ids, regions, None, business, subbusiness, 
+            fin_or_exec, primary_or_secondary, None, row_granularity
+        )
+        
+        # Apply column granularity if specified
+        if col_granularity and not mock_df.empty:
+            mock_df = _apply_column_granularity(mock_df, col_granularity, "revenues")
+        
+        return mock_df
+
+    except Exception as e:
+        return pd.DataFrame()
 
 def get_balances(
-    client_ids: List[str],
-    start_date: str,
-    end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness", "region", "country", "balance_type"],
-    region: Optional[List[str]] = None,
-    country: Optional[List[str]] = None,
+    entities: List[str],
+    date_range: str,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    regions: Optional[List[str]] = None,
+    countries: Optional[List[str]] = None,
     balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
+    row_granularity: List[str] = ["aggregate"],
+    col_granularity: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
-    Placeholder for the get_balances API.
-    Returns a pandas DataFrame of balance data, aggregated as specified.
-    
-    balance_type parameter supports:
-    - PB/Clearing subbusiness: "Debit", "Credit", "Physical Shorts"
-    - SPG subbusiness: "Synthetic Longs", "Synthetic Shorts"
+    Retrieves balance data for specific entities and date range.
+    Now supports multi-dimensional row_granularity with up to 2 dimensions.
     """
-    print(f"--- CALLING get_balances(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', business='{business}', subbusiness='{subbusiness}', balance_type='{balance_type}', granularity='{granularity}') ---")
+    try:
+        start_date, end_date = _parse_date_range(date_range)
+        client_ids = [_resolve_client_name(entity) for entity in entities]
+        
+        mock_df = _generate_mock_data(
+            start_date, end_date, "balances", client_ids, regions, countries, business, subbusiness, 
+            None, None, balance_type, row_granularity
+        )
+        
+        # Apply column granularity if specified  
+        if col_granularity and not mock_df.empty:
+            mock_df = _apply_column_granularity(mock_df, col_granularity, "balances")
+        
+        return mock_df
 
-    return _generate_mock_data(
-        start_date=start_date, end_date=end_date, metric="balances",
-        client_ids=client_ids, region=region, country=country,
-        business=business, subbusiness=subbusiness, balance_type=balance_type, granularity=granularity
-    )
+    except Exception as e:
+        return pd.DataFrame()
 
 def get_capital(
-    client_ids: List[str],
-    start_date: str,
-    end_date: str,
-    granularity: Literal["aggregate", "client", "date", "business", "subbusiness"],
-    metric: str = "Total AE",
+    entities: List[str],
+    date_range: str,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    regions: Optional[List[str]] = None,
+    row_granularity: List[str] = ["aggregate"],
+    col_granularity: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
-    Placeholder for the get_capital API.
-    Returns a pandas DataFrame of capital data, aggregated as specified.
-    Supports multiple metrics: "Total RWA", "Portfolio RWA", "Borrow RWA", "Balance Sheet", 
-    "Supplemental Balance Sheet", "GSIB Points", "Total AE", "Preferred AE".
-    Note: Capital data only supports filtering by subbusiness, not by region or country.
+    Retrieves capital data (Total RWA, Portfolio RWA, etc.) for specific entities and date range.
+    Now supports multi-dimensional row_granularity with up to 2 dimensions.
     """
-    print(f"--- CALLING get_capital(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', metric='{metric}', business='{business}', subbusiness='{subbusiness}', granularity='{granularity}') ---")
+    try:
+        start_date, end_date = _parse_date_range(date_range)
+        client_ids = [_resolve_client_name(entity) for entity in entities]
+        
+        # For capital metrics, use balance mock data as a proxy but return different column names
+        mock_df = _generate_mock_data(
+            start_date, end_date, "balances", client_ids, regions, None, business, subbusiness, 
+            None, None, None, row_granularity
+        )
+        
+        if not mock_df.empty and "balances" in mock_df.columns:
+            # Transform balance data to capital metrics
+            mock_df = mock_df.rename(columns={"balances": "capital"})
+            mock_df["capital"] = mock_df["capital"] * 0.1  # Convert to capital ratio
+            
+            # Apply column granularity if specified
+            if col_granularity:
+                mock_df = _apply_column_granularity(mock_df, col_granularity, "capital")
+        
+        return mock_df
 
-    return _generate_mock_capital_data(
-        start_date=start_date, end_date=end_date, metric=metric,
-        client_ids=client_ids, business=business,
-        subbusiness=subbusiness, granularity=granularity
-    )
+    except Exception as e:
+        return pd.DataFrame()
 
 def get_balances_decomposition(
-    client_ids: List[str],
-    start_date: str,
-    end_date: str,
-    granularity: Literal["aggregate", "client", "business", "subbusiness", "region", "country"],
-    region: Optional[List[str]] = None,
-    country: Optional[List[str]] = None,
+    entities: List[str],
+    date_range: str,
     business: Optional[Literal["Prime", "Equities Ex Prime", "FICC", "Equities"]] = None,
     subbusiness: Optional[Literal["PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro"]] = None,
+    regions: Optional[List[str]] = None,
+    countries: Optional[List[str]] = None,
+    balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
+    row_granularity: List[str] = ["aggregate"]
 ) -> pd.DataFrame:
     """
-    Placeholder for the get_balances_decomposition API.
-    Returns a DataFrame breaking down balance changes into MTM and Activity components.
+    Retrieves detailed balance decomposition data for specific entities and date range.
+    Now supports multi-dimensional row_granularity with up to 2 dimensions.
+    Note: This function does not support col_granularity (intentionally excluded).
     """
-    print(f"--- CALLING get_balances_decomposition(client_ids={client_ids}, start_date='{start_date}', end_date='{end_date}', granularity='{granularity}') ---")
+    try:
+        start_date, end_date = _parse_date_range(date_range)
+        client_ids = [_resolve_client_name(entity) for entity in entities]
+        
+        mock_df = _generate_mock_data(
+            start_date, end_date, "balances", client_ids, regions, countries, business, subbusiness, 
+            None, None, balance_type, row_granularity
+        )
+        
+        if not mock_df.empty and "balances" in mock_df.columns:
+            # Create decomposition columns
+            mock_df = mock_df.rename(columns={"balances": "total_balance"})
+            mock_df["cash"] = mock_df["total_balance"] * 0.3
+            mock_df["securities"] = mock_df["total_balance"] * 0.5
+            mock_df["other"] = mock_df["total_balance"] * 0.2
 
-    # This is a simplified mock. A real implementation would fetch data and calculate the decomposition.
-    base_data = _generate_mock_data(
-        start_date=start_date, end_date=end_date, metric="balances",
-        client_ids=client_ids, region=region, country=country,
-        business=business, subbusiness=subbusiness, granularity=granularity
-    )
+        return mock_df
 
-    if base_data.empty:
-        return pd.DataFrame(columns=[granularity, 'Balance.Start', 'Balance.End', 'Balance.Delta.Total', 'Balance.Delta.MTM', 'Balance.Delta.Activity'])
+    except Exception as e:
+        return pd.DataFrame() 
 
-    # Mock the decomposition columns
-    # In a real scenario, these would be calculated based on a more complex dataset
-    if 'balances' in base_data.columns:
-        base_data = base_data.rename(columns={'balances': 'Balance.End'})
-        base_data['Balance.Start'] = base_data['Balance.End'] * (1 + np.random.uniform(-0.2, 0.2, size=len(base_data)))
+def _parse_date_range(date_description: str) -> tuple[str, str]:
+    """
+    Parse natural language date description into start_date and end_date.
+    This is a simplified version - a real implementation would be more sophisticated.
+    """
+    # Simple parsing for common patterns
+    if "Q1 2024" in date_description:
+        return "2024-01-01", "2024-03-31"
+    elif "Q2 2024" in date_description:
+        return "2024-04-01", "2024-06-30"
+    elif "Q3 2024" in date_description:
+        return "2024-07-01", "2024-09-30"
+    elif "Q4 2024" in date_description:
+        return "2024-10-01", "2024-12-31"
+    elif "2024" in date_description:
+        return "2024-01-01", "2024-12-31"
+    elif "last 30 days" in date_description.lower():
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
     else:
-         # Handle aggregate case where only one value exists
-        base_data['Balance.End'] = base_data.iloc[:, 0]
-        base_data['Balance.Start'] = base_data['Balance.End'] * (1 + np.random.uniform(-0.2, 0.2, size=len(base_data)))
+        # Default to last month
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)
+        return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
+def _resolve_client_name(entity: str) -> str:
+    """
+    Convert entity name to client ID.
+    This is a simplified mapping - real implementation would use a lookup service.
+    """
+    entity_lower = entity.lower()
+    if "millennium" in entity_lower:
+        return "cl_id_0"
+    elif "systematic" in entity_lower:
+        return "cl_id_1"
+    elif "citadel" in entity_lower:
+        return "cl_id_2"
+    elif "two sigma" in entity_lower:
+        return "cl_id_3"
+    elif "bridgewater" in entity_lower:
+        return "cl_id_4"
+    else:
+        # Generate a consistent ID based on the name
+        return f"cl_id_{hash(entity) % 100}"
 
-    base_data['Balance.Delta.Total'] = base_data['Balance.End'] - base_data['Balance.Start']
-    base_data['Balance.Delta.MTM'] = base_data['Balance.Delta.Total'] * np.random.uniform(0.3, 0.7, size=len(base_data))
-    base_data['Balance.Delta.Activity'] = base_data['Balance.Delta.Total'] - base_data['Balance.Delta.MTM']
+def _apply_column_granularity(df: pd.DataFrame, col_granularity: List[str], metric: str) -> pd.DataFrame:
+    """
+    Apply column granularity to pivot the data.
+    This is a simplified implementation for demonstration.
+    """
+    if df.empty or not col_granularity:
+        return df
     
-    return base_data 
+    # Map granularity values to actual column names
+    granularity_column_map = {
+        "aggregate": None,  # Special case
+        "business": "business",
+        "subbusiness": "subbusiness", 
+        "region": "region",
+        "country": "country",
+        "balance_type": "balance_type",
+        "fin_or_exec": "fin_or_exec",
+        "primary_or_secondary": "primary_or_secondary"
+    }
+    
+    # Handle aggregate case
+    if "aggregate" in col_granularity:
+        # Sum the metric column
+        total = df[metric].sum()
+        return pd.DataFrame({f"{metric}_total": [total]})
+    
+    # Find the column to pivot on
+    pivot_col = None
+    for granularity in col_granularity:
+        if granularity in granularity_column_map and granularity_column_map[granularity]:
+            col_name = granularity_column_map[granularity]
+            if col_name in df.columns:
+                pivot_col = col_name
+                break
+    
+    if not pivot_col:
+        return df
+    
+    try:
+        # Create a pivot table
+        remaining_cols = [col for col in df.columns if col not in [metric, pivot_col]]
+        if remaining_cols:
+            pivot_df = df.pivot_table(
+                values=metric,
+                index=remaining_cols,
+                columns=pivot_col,
+                aggfunc='sum',
+                fill_value=0
+            ).reset_index()
+            # Flatten column names
+            pivot_df.columns.name = None
+            return pivot_df
+        else:
+            # Simple groupby if no other columns
+            return df.groupby(pivot_col)[metric].sum().reset_index()
+    except Exception:
+        # Return original if pivot fails
+        return df 

@@ -375,6 +375,99 @@ GOOD_PLAN: {{
 }}
 --- END EXAMPLE 9 ---
 
+--- FEW-SHOT EXAMPLE 10 (Enhanced Granularity - Row and Column) ---
+USER_QUERY: "Show me revenues by client and business for Q1 2024"
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch revenue data broken down by client (rows) and business (columns) for Q1 2024.",
+            "parameters": {{
+                "metric": "revenues",
+                "entities": ["all clients"],
+                "date_description": "Q1 2024",
+                "row_granularity": "client",
+                "col_granularity": "business",
+                "output_variable": "revenues_client_business"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 10 ---
+
+--- FEW-SHOT EXAMPLE 11 (Enhanced Granularity - Multiple Dimensions) ---
+USER_QUERY: "Break down balances by region and subbusiness for last month"
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch balance data broken down by region (rows) and subbusiness (columns) for last month.",
+            "parameters": {{
+                "metric": "balances",
+                "entities": ["all clients"],
+                "date_description": "last month",
+                "row_granularity": "region",
+                "col_granularity": "subbusiness",
+                "output_variable": "balances_region_subbusiness"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 11 ---
+
+## Enhanced Granularity System
+
+The system now supports **multi-dimensional granularity** for more sophisticated data analysis:
+
+### Row Granularity (row_granularity)
+- **Type**: List of strings (max 2 items)
+- **Purpose**: Controls row grouping in the resulting dataframe
+- **Available values**: ["aggregate", "client", "date", "business", "subbusiness", "region", "country", "balance_type", "fin_or_exec", "primary_or_secondary"]
+- **Multi-dimensional examples**:
+  - `["date", "client"]` - Groups data by both date and client (useful for time series per client)
+  - `["business", "date"]` - Groups data by business line over time
+  - `["region", "business"]` - Groups data by region and business line
+- **Rules**:
+  - Cannot contain duplicate values
+  - If "aggregate" is used, it must be the only value
+  - Maximum 2 dimensions allowed
+
+### Column Granularity (col_granularity)
+- **Type**: Optional list of strings (max 2 items)
+- **Purpose**: Controls column grouping/pivoting in the resulting dataframe
+- **Available values**: Same as row_granularity except "client" and "date" are excluded
+- **Rules**:
+  - Cannot overlap with row_granularity values
+  - Cannot contain duplicate values
+  - If "aggregate" is used, it must be the only value
+
+### Function Support:
+- **get_revenues**: Supports both row_granularity and col_granularity
+- **get_balances**: Supports both row_granularity and col_granularity  
+- **get_capital**: Supports both row_granularity and col_granularity
+- **get_balances_decomposition**: Supports only row_granularity (col_granularity excluded by design)
+
+### Examples:
+
+**Single dimension (backward compatible):**
+```python
+row_granularity=["client"]  # Group by client only
+```
+
+**Multi-dimensional analysis:**
+```python
+row_granularity=["date", "client"]     # Time series data per client
+col_granularity=["business"]           # With business lines as columns
+```
+
+**Business analysis over time:**
+```python
+row_granularity=["business", "date"]   # Business performance over time
+col_granularity=["region"]             # With regional breakdown as columns
+```
+
+**Important**: Always ensure no overlap between row_granularity and col_granularity values.
+
 Based on these principles and examples, generate a plan for the user's query.
 
 Your available tools are:
@@ -388,8 +481,11 @@ Your available tools are:
    - The `primary_or_secondary` parameter filters by primary or secondary revenue. It can be a list containing "Primary" or "Secondary". (For 'revenues' metric ONLY).
    - The `business` parameter can be one of: "Prime", "Equities Ex Prime", "FICC".
    - The `subbusiness` parameter can be one of: "PB", "SPG", "Futures", "DCS", "One Delta", "Eq Deriv", "Credit", "Macro".
-   - The `granularity` parameter can be one of: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (country is for 'balances' only), "balance_type" (balances only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only).
-   - For capital-related metrics (Total RWA, Portfolio RWA, Total AE, etc.), supported granularities are: "aggregate", "client", "date", "business", "subbusiness".
+   - **ENHANCED GRANULARITY SYSTEM**: All functions (`revenues`, `balances`, `balances_decomposition`, and capital metrics) now use consistent granularity parameters:
+     * `row_granularity`: Controls how data is grouped in rows. Can be: "aggregate", "client", "date", "business", "subbusiness", "region", "country" (for balances only), "balance_type" (balances only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only).
+     * `col_granularity` (optional): Controls additional column grouping. Can be: "aggregate", "business", "subbusiness", "region", "country" (for balances only), "balance_type" (balances only), "fin_or_exec" (revenues only), "primary_or_secondary" (revenues only). Note: "client" and "date" are NOT allowed for col_granularity.
+   - For capital-related metrics (Total RWA, Portfolio RWA, Total AE, etc.), supported row_granularities are: "aggregate", "client", "date", "business", "subbusiness". Supported col_granularities are: "aggregate", "business", "subbusiness".
+   - For `balances_decomposition`, col_granularity is not typically used, but row_granularity follows the same pattern.
 2. `describe_dataframe`: To see the schema (columns and data types) of a dataframe that you have fetched.
 3. `code_executor`: To perform any kind of analysis on the dataframes using Python and the pandas library. The final line of your code block MUST be an expression that results in a pandas DataFrame, which will be saved back to the workspace.
 4. `get_valid_business_lines`: To get a list of valid `business` and `subbusiness` values for the `data_fetch` tool.
