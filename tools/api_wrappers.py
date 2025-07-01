@@ -18,7 +18,8 @@ def _generate_mock_data(
     fin_or_exec: Optional[List[str]] = None,
     primary_or_secondary: Optional[List[str]] = None,
     balance_type: Optional[Literal["Debit", "Credit", "Physical Shorts", "Synthetic Longs", "Synthetic Shorts"]] = None,
-    row_granularity: Optional[List[str]] = None
+    row_granularity: Optional[List[str]] = None,
+    col_granularity: Optional[List[str]] = None
 ) -> pd.DataFrame:
     """
     Generates a DataFrame of daily data, then filters and aggregates it based on the provided parameters.
@@ -148,6 +149,14 @@ def _generate_mock_data(
             if col_name in df.columns:
                 group_cols.append(col_name)
     
+    # Also include columns needed for column granularity (these will be preserved for pivoting)
+    if col_granularity:
+        for granularity in col_granularity:
+            if granularity in granularity_column_map:
+                col_name = granularity_column_map[granularity]
+                if col_name in df.columns and col_name not in group_cols:
+                    group_cols.append(col_name)
+    
     if not group_cols:
         return pd.DataFrame()
 
@@ -198,9 +207,18 @@ def get_revenues(
         start_date, end_date = _parse_date_range(date_range)
         client_ids = [_resolve_client_name(entity) for entity in entities]
         
+        # Don't filter by parameters that will be used in column granularity
+        business_filter = business
+        subbusiness_filter = subbusiness
+        if col_granularity:
+            if "business" in col_granularity:
+                business_filter = None
+            if "subbusiness" in col_granularity:
+                subbusiness_filter = None
+        
         mock_df = _generate_mock_data(
-            start_date, end_date, "revenues", client_ids, regions, None, business, subbusiness, 
-            fin_or_exec, primary_or_secondary, None, row_granularity
+            start_date, end_date, "revenues", client_ids, regions, None, business_filter, subbusiness_filter, 
+            fin_or_exec, primary_or_secondary, None, row_granularity, col_granularity
         )
         
         # Apply column granularity if specified
@@ -231,9 +249,21 @@ def get_balances(
         start_date, end_date = _parse_date_range(date_range)
         client_ids = [_resolve_client_name(entity) for entity in entities]
         
+        # Don't filter by parameters that will be used in column granularity
+        business_filter = business
+        subbusiness_filter = subbusiness
+        balance_type_filter = balance_type
+        if col_granularity:
+            if "business" in col_granularity:
+                business_filter = None
+            if "subbusiness" in col_granularity:
+                subbusiness_filter = None
+            if "balance_type" in col_granularity:
+                balance_type_filter = None
+        
         mock_df = _generate_mock_data(
-            start_date, end_date, "balances", client_ids, regions, countries, business, subbusiness, 
-            None, None, balance_type, row_granularity
+            start_date, end_date, "balances", client_ids, regions, countries, business_filter, subbusiness_filter, 
+            None, None, balance_type_filter, row_granularity, col_granularity
         )
         
         # Apply column granularity if specified  
@@ -262,10 +292,19 @@ def get_capital(
         start_date, end_date = _parse_date_range(date_range)
         client_ids = [_resolve_client_name(entity) for entity in entities]
         
+        # Don't filter by parameters that will be used in column granularity
+        business_filter = business
+        subbusiness_filter = subbusiness
+        if col_granularity:
+            if "business" in col_granularity:
+                business_filter = None
+            if "subbusiness" in col_granularity:
+                subbusiness_filter = None
+        
         # For capital metrics, use balance mock data as a proxy but return different column names
         mock_df = _generate_mock_data(
-            start_date, end_date, "balances", client_ids, regions, None, business, subbusiness, 
-            None, None, None, row_granularity
+            start_date, end_date, "balances", client_ids, regions, None, business_filter, subbusiness_filter, 
+            None, None, None, row_granularity, col_granularity
         )
         
         if not mock_df.empty and "balances" in mock_df.columns:
@@ -303,7 +342,7 @@ def get_balances_decomposition(
         
         mock_df = _generate_mock_data(
             start_date, end_date, "balances", client_ids, regions, countries, business, subbusiness, 
-            None, None, balance_type, row_granularity
+            None, None, balance_type, row_granularity, None
         )
         
         if not mock_df.empty and "balances" in mock_df.columns:
@@ -351,23 +390,24 @@ def _resolve_client_name(entity: str) -> str:
     """
     entity_lower = entity.lower()
     if "millennium" in entity_lower:
-        return "cl_id_0"
+        return "cl_id_millennium"
     elif "systematic" in entity_lower:
-        return "cl_id_1"
+        return "cl_id_systematic"
     elif "citadel" in entity_lower:
-        return "cl_id_2"
+        return "cl_id_citadel"
     elif "two sigma" in entity_lower:
-        return "cl_id_3"
+        return "cl_id_two_sigma"
     elif "bridgewater" in entity_lower:
-        return "cl_id_4"
+        return "cl_id_bridgewater"
     else:
         # Generate a consistent ID based on the name
-        return f"cl_id_{hash(entity) % 100}"
+        clean_name = entity.lower().replace(' ', '_').replace('.', '').replace('-', '_')
+        return f"cl_id_{clean_name}"
 
 def _apply_column_granularity(df: pd.DataFrame, col_granularity: List[str], metric: str) -> pd.DataFrame:
     """
     Apply column granularity to pivot the data.
-    This is a simplified implementation for demonstration.
+    This creates columns for each unique value in the specified granularity dimensions.
     """
     if df.empty or not col_granularity:
         return df
@@ -386,11 +426,18 @@ def _apply_column_granularity(df: pd.DataFrame, col_granularity: List[str], metr
     
     # Handle aggregate case
     if "aggregate" in col_granularity:
-        # Sum the metric column
-        total = df[metric].sum()
-        return pd.DataFrame({f"{metric}_total": [total]})
+        # Sum the metric column across all remaining dimensions
+        remaining_cols = [col for col in df.columns if col not in [metric] and not col.endswith('_name')]
+        if remaining_cols:
+            agg_df = df.groupby(remaining_cols)[metric].sum().reset_index()
+            total = agg_df[metric].sum()
+            return pd.DataFrame({**{col: agg_df[col].iloc[0] if len(agg_df) == 1 else 'Multiple' for col in remaining_cols}, 
+                               f"{metric}_total": [total]})
+        else:
+            total = df[metric].sum()
+            return pd.DataFrame({f"{metric}_total": [total]})
     
-    # Find the column to pivot on
+    # Find the column to pivot on (take the first valid one)
     pivot_col = None
     for granularity in col_granularity:
         if granularity in granularity_column_map and granularity_column_map[granularity]:
@@ -403,22 +450,46 @@ def _apply_column_granularity(df: pd.DataFrame, col_granularity: List[str], metr
         return df
     
     try:
-        # Create a pivot table
-        remaining_cols = [col for col in df.columns if col not in [metric, pivot_col]]
-        if remaining_cols:
+        # Get all columns that should be preserved as index (not pivoted)
+        index_cols = [col for col in df.columns if col not in [metric, pivot_col] and not col.endswith('_name')]
+        
+        if index_cols:
+            # Create pivot table with proper column naming
             pivot_df = df.pivot_table(
                 values=metric,
-                index=remaining_cols,
+                index=index_cols,
                 columns=pivot_col,
                 aggfunc='sum',
                 fill_value=0
-            ).reset_index()
-            # Flatten column names
-            pivot_df.columns.name = None
+            )
+            
+            # Reset index and flatten column names
+            pivot_df = pivot_df.reset_index()
+            
+            # Flatten multi-level columns if any
+            if isinstance(pivot_df.columns, pd.MultiIndex):
+                pivot_df.columns = [f"{metric}_{col}" if col != '' else index_col 
+                                  for index_col, col in pivot_df.columns]
+            else:
+                # Rename columns to include metric prefix for pivoted values
+                new_columns = {}
+                for col in pivot_df.columns:
+                    if col in index_cols:
+                        new_columns[col] = col
+                    else:
+                        new_columns[col] = f"{metric}_{col}"
+                pivot_df = pivot_df.rename(columns=new_columns)
+            
+            # Add client names if client_id is present
+            if 'client_id' in pivot_df.columns:
+                pivot_df['client_name'] = pivot_df['client_id'].apply(lambda x: x.replace('cl_id_', '').title())
+            
             return pivot_df
         else:
-            # Simple groupby if no other columns
+            # No index columns, just group by pivot column
             return df.groupby(pivot_col)[metric].sum().reset_index()
-    except Exception:
+            
+    except Exception as e:
+        print(f"Error in column granularity pivot: {e}")
         # Return original if pivot fails
         return df 

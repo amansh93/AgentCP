@@ -415,6 +415,41 @@ GOOD_PLAN: {{
 }}
 --- END EXAMPLE 11 ---
 
+--- FEW-SHOT EXAMPLE 12 (Multi-Dimensional Analysis with Business Lines) ---
+USER_QUERY: "I need to analyze how Millennium and Citadel's revenue performance has evolved over Q1 2024, broken down by both date and client, but I also want to see the breakdown across different business lines as columns. I'm particularly interested in Prime and FICC business, and I want to focus on financing revenues only."
+GOOD_PLAN: {{
+    "plan": [
+        {{
+            "tool_name": "data_fetch",
+            "summary": "Fetch financing revenue data for Millennium and Citadel over Q1 2024, broken down by date and client (rows) with business lines as columns. Note: Do NOT filter by specific business since we want ALL business lines as columns.",
+            "parameters": {{
+                "metric": "revenues",
+                "entities": ["Millennium", "Citadel"],
+                "date_description": "Q1 2024",
+                "row_granularity": ["date", "client"],
+                "col_granularity": ["business"],
+                "fin_or_exec": ["Financing"],
+                "output_variable": "multi_dimensional_revenues"
+            }}
+        }},
+        {{
+            "tool_name": "describe_dataframe",
+            "summary": "Check the structure of the multi-dimensional revenue data to understand the columns.",
+            "parameters": {{
+                "df_name": "multi_dimensional_revenues"
+            }}
+        }},
+        {{
+            "tool_name": "code_executor",
+            "summary": "Create a time series plot showing revenue trends for each client with business line breakdowns.",
+            "parameters": {{
+                "code": "plot_df = dataframes['multi_dimensional_revenues']; actual_plot_path = plot_timeseries(df=plot_df, date_col='date', title='Multi-Dimensional Revenue Analysis: Millennium vs Citadel by Business Line - Q1 2024', figsize=(16, 10)); dataframes['plot_result'] = pd.DataFrame([{{'plot_path': actual_plot_path}}]); print('Multi-dimensional plot saved at:', actual_plot_path)"
+            }}
+        }}
+    ]
+}}
+--- END EXAMPLE 12 ---
+
 ## Enhanced Granularity System
 
 The system now supports **multi-dimensional granularity** for more sophisticated data analysis:
@@ -440,6 +475,10 @@ The system now supports **multi-dimensional granularity** for more sophisticated
   - Cannot overlap with row_granularity values
   - Cannot contain duplicate values
   - If "aggregate" is used, it must be the only value
+- **IMPORTANT**: When using col_granularity, do NOT filter by the same parameter. For example:
+  - If using `col_granularity=["business"]`, do NOT set the `business` parameter
+  - If using `col_granularity=["subbusiness"]`, do NOT set the `subbusiness` parameter
+  - This allows all values of that dimension to be included and pivoted into columns
 
 ### Function Support:
 - **get_revenues**: Supports both row_granularity and col_granularity
